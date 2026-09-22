@@ -47,3 +47,12 @@ out/
 
 ### Elasticsearch ###
 elasticsearch/certs/
+
+### 환경변수 ###
+.env
+.env.*
+!.env.example
+
+### AI 도구 ###
+CLAUDE.md
+.claude/
