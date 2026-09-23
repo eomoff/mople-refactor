@@ -1,13 +1,17 @@
 name: CD Pipeline
 
-# nginx/EC2 트랙(직접 로드밸런싱)이 ALB/Fargate 트랙을 완전히 대체하면서
-# 이 파일도 nginx 배포 전용으로 교체됨. main에 푸시되고 CI가 통과하면 자동 실행.
 on:
   workflow_run:
-    workflows: ["CI PipeLine"]
-    types: [completed]
-    branches: [ "main" ]
+    workflows: ["CI PipeLine"]  # 작성한 ci 이름을 대상으로
+    types: [completed]          # 해당 ci가 끝날때 실행해라
+    branches: [ "main" ]        # main 브랜치에서 돈 CI만 대상으로함
 
+# push 해서 배포가 도는 중에 또 push가 들어와서 동시에 실행되는 일이 없게끔
+# concurrency: 배포가 동시에 실행되지 않도록 설정
+# group: 이 이름이 같은 배포끼리는 동시에 실행되지 않고 하나씩 실행됨
+# cancel-in-progress:
+#   true  - 먼저 돌던 배포를 멈추고 새로 들어온 배포 시작
+#   false - 먼저 돌던 배포를 끝까지 돌리고 새로 들어온 배포 시작
 concurrency:
   group: mople-production-${{ github.event.workflow_run.head_branch }}
   cancel-in-progress: false
