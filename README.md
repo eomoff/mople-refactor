@@ -4,7 +4,6 @@
 
 <div align="center">
 
-![Coverage](https://raw.githubusercontent.com/dkegldh/sb11-mople-team2/badges/.github/badges/jacoco.svg)
 ![Java](https://img.shields.io/badge/Java-17-ED8B00?logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.16-6DB33F?logo=springboot&logoColor=white)
 ![Gradle](https://img.shields.io/badge/Gradle-9.5.1-02303A?logo=gradle&logoColor=white)
