@@ -1,5 +1,2 @@
 .git
 build/
-
-# Elasticsearch certificates
-elasticsearch/certs

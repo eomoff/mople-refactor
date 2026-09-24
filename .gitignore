@@ -45,9 +45,6 @@ out/
 #임시 얼로드 폴더 제외
 /uploads/
 
-### Elasticsearch ###
-elasticsearch/certs/
-
 ### 환경변수 ###
 .env
 .env.*
