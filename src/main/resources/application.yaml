@@ -118,7 +118,7 @@ external-api:
 batch:
   tmdb:
     collect:
-      max-pages: 5
+      max-pages: 20
       skip-limit: 10
       # max-pages 를 올리면 이 값도 함께 올려야함
       lock-at-most-for: PT10M
@@ -134,7 +134,7 @@ sse:
     enabled: true
 
 mail:
-  from: ${MAIL_FROM:moplaylist0727@gmail.com}
+  from: ${MAIL_FROM:eomoff@gmail.com}
 
 mople:
   kafka:
