@@ -6,13 +6,13 @@ spring:
   data:
     redis:
       host: localhost
-      port: 6380
+      port: 6379
       # 커맨드 타임아웃, 이게 없으면 응답 없는 Redis에 요청 스레드가 묶임
       timeout: 2s
       connect-timeout: 1s
 
   elasticsearch:
-    uris: http://localhost:19201
+    uris: http://localhost:9200
 
   jpa:
     hibernate:
@@ -46,7 +46,7 @@ spring:
       initialize-schema: always
 
   kafka:
-    bootstrap-servers: localhost:9093
+    bootstrap-servers: localhost:9092
 
   mail:
     host: smtp-relay.brevo.com
