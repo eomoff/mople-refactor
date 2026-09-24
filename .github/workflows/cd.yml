@@ -22,12 +22,9 @@ permissions:
 env:
   AWS_REGION: ap-northeast-2
   ECR_APP_REPOSITORY: mople-app-lb
-  ECR_NGINX_REPOSITORY: mople-nginx-lb
   ECS_CLUSTER: mople-nginx-cluster
   APP_SERVICE: mople-app-lb-service
-  NGINX_SERVICE: mople-nginx-lb-service
   APP_TASK_DEF_FILE: ecs/task-def-app.json
-  NGINX_TASK_DEF_FILE: ecs/task-def-nginx.json
 
 jobs:
   build-and-push:
@@ -61,16 +58,6 @@ jobs:
           docker tag $REGISTRY/$ECR_APP_REPOSITORY:$IMAGE_TAG $REGISTRY/$ECR_APP_REPOSITORY:latest
           docker push $REGISTRY/$ECR_APP_REPOSITORY:$IMAGE_TAG
           docker push $REGISTRY/$ECR_APP_REPOSITORY:latest
-
-      - name: nginx 이미지 빌드 및 푸시
-        env:
-          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
-          IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
-        run: |
-          docker build --provenance=false -f nginx/Dockerfile.prod -t $REGISTRY/$ECR_NGINX_REPOSITORY:$IMAGE_TAG ./nginx
-          docker tag $REGISTRY/$ECR_NGINX_REPOSITORY:$IMAGE_TAG $REGISTRY/$ECR_NGINX_REPOSITORY:latest
-          docker push $REGISTRY/$ECR_NGINX_REPOSITORY:$IMAGE_TAG
-          docker push $REGISTRY/$ECR_NGINX_REPOSITORY:latest
 
   deploy:
     needs: build-and-push
@@ -112,15 +99,6 @@ jobs:
             --output text)
           echo "task_def_arn=$TASK_DEF_ARN" >> "$GITHUB_OUTPUT"
 
-      - name: nginx 태스크 정의 등록
-        id: register-nginx
-        run: |
-          TASK_DEF_ARN=$(aws ecs register-task-definition \
-            --cli-input-json file://${{ env.NGINX_TASK_DEF_FILE }} \
-            --query 'taskDefinition.taskDefinitionArn' \
-            --output text)
-          echo "task_def_arn=$TASK_DEF_ARN" >> "$GITHUB_OUTPUT"
-
       - name: app 서비스 업데이트
         run: |
           aws ecs update-service \
@@ -129,22 +107,8 @@ jobs:
             --task-definition ${{ steps.register-app.outputs.task_def_arn }} \
             --force-new-deployment
 
-      - name: nginx 서비스 업데이트
-        run: |
-          aws ecs update-service \
-            --cluster ${{ env.ECS_CLUSTER }} \
-            --service ${{ env.NGINX_SERVICE }} \
-            --task-definition ${{ steps.register-nginx.outputs.task_def_arn }} \
-            --force-new-deployment
-
       - name: app 배포 안정화 대기
         run: |
           aws ecs wait services-stable \
             --cluster ${{ env.ECS_CLUSTER }} \
             --services ${{ env.APP_SERVICE }}
-
-      - name: nginx 배포 안정화 대기
-        run: |
-          aws ecs wait services-stable \
-            --cluster ${{ env.ECS_CLUSTER }} \
-            --services ${{ env.NGINX_SERVICE }}
