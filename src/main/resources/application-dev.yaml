@@ -92,7 +92,7 @@ redis:
 batch:
   tmdb:
     collect:
-      cron: "30 * * * * *"
+      cron: ""
       enabled: true
 
 oauth2:
