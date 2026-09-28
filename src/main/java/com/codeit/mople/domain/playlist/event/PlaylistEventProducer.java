@@ -24,12 +24,12 @@ public class PlaylistEventProducer {
     this.playlistEventTopic = properties.topics().playlistEvents();
     this.playlistSearchIndexTopic = properties.topics().playlistSearchIndex();
   }
-
+  // 구독
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void on(PlaylistSubscribedEvent event) {
     eventPublisher.publish(playlistEventTopic, event.playlistId().toString(), event);
   }
-
+  // 구독 취소
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void on(PlaylistUnsubscribedEvent event) {
     eventPublisher.publish(playlistEventTopic, event.playlistId().toString(), event);
