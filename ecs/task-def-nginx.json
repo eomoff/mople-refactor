@@ -4,7 +4,7 @@
   "requiresCompatibilities": ["EC2"],
   "cpu": "256",
   "memory": "512",
-  "executionRoleArn": "arn:aws:iam::291883201761:role/ecsTaskExecutionRole",
+  "executionRoleArn": "arn:aws:iam::366112400894:role/ecsTaskExecutionRole",
   "volumes": [
     {
       "name": "letsencrypt",
@@ -16,7 +16,7 @@
   "containerDefinitions": [
     {
       "name": "nginx",
-      "image": "291883201761.dkr.ecr.ap-northeast-2.amazonaws.com/mople-nginx-lb:latest",
+      "image": "366112400894.dkr.ecr.ap-northeast-2.amazonaws.com/mople-nginx-lb:latest",
       "essential": true,
       "portMappings": [
         {
@@ -39,9 +39,9 @@
       ],
       "environment": [],
       "secrets": [
-        { "name": "APP_INSTANCE_1", "valueFrom": "arn:aws:ssm:ap-northeast-2:291883201761:parameter/mople/APP_INSTANCE_1" },
-        { "name": "APP_INSTANCE_2", "valueFrom": "arn:aws:ssm:ap-northeast-2:291883201761:parameter/mople/APP_INSTANCE_2" },
-        { "name": "APP_INSTANCE_3", "valueFrom": "arn:aws:ssm:ap-northeast-2:291883201761:parameter/mople/APP_INSTANCE_3" }
+        { "name": "APP_INSTANCE_1", "valueFrom": "arn:aws:ssm:ap-northeast-2:366112400894:parameter/mople/APP_INSTANCE_1" },
+        { "name": "APP_INSTANCE_2", "valueFrom": "arn:aws:ssm:ap-northeast-2:366112400894:parameter/mople/APP_INSTANCE_2" },
+        { "name": "APP_INSTANCE_3", "valueFrom": "arn:aws:ssm:ap-northeast-2:366112400894:parameter/mople/APP_INSTANCE_3" }
       ],
       "healthCheck": {
         "command": ["CMD-SHELL", "wget -q --spider http://localhost:80/nginx-health || exit 1"],
