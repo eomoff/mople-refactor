@@ -87,7 +87,7 @@ redis:
 batch:
   tmdb:
     collect:
-      cron: "0 0 4 * * *"
+      cron: "0 0 3 * * *"
       enabled: ${TMDB_COLLECT_ENABLED:false}
 
 sse:
