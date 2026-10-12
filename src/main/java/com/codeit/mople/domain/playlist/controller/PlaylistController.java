@@ -96,7 +96,7 @@ public class PlaylistController implements PlaylistApi {
   @PostMapping("/{playlistId}/subscription")
   public ResponseEntity<Void> createSubscribe(
       @PathVariable UUID playlistId,
-      @AuthenticationPrincipal CustomUserDetails principal
+      @AuthenticationPrincipal(errorOnInvalidType = true) CustomUserDetails principal
   ) {
     playlistService.subscribe(playlistId, principal.getUserId());
     return ResponseEntity.noContent().build();
@@ -106,7 +106,7 @@ public class PlaylistController implements PlaylistApi {
   @DeleteMapping("/{playlistId}/subscription")
   public ResponseEntity<Void> cancelSubscribe(
       @PathVariable UUID playlistId,
-      @AuthenticationPrincipal CustomUserDetails principal
+      @AuthenticationPrincipal(errorOnInvalidType = true) CustomUserDetails principal
   ) {
     playlistService.unSubscribe(playlistId, principal.getUserId());
     return ResponseEntity.noContent().build();
@@ -117,7 +117,7 @@ public class PlaylistController implements PlaylistApi {
   public ResponseEntity<Void> addContentPlaylist(
       @PathVariable UUID playlistId,
       @PathVariable UUID contentId,
-      @AuthenticationPrincipal CustomUserDetails principal
+      @AuthenticationPrincipal(errorOnInvalidType = true) CustomUserDetails principal
   ) {
     playlistService.addContent(playlistId, contentId, principal.getUserId());
     return ResponseEntity.noContent().build();
@@ -128,7 +128,7 @@ public class PlaylistController implements PlaylistApi {
   public ResponseEntity<Void> removeContentPlaylist(
       @PathVariable UUID playlistId,
       @PathVariable UUID contentId,
-      @AuthenticationPrincipal CustomUserDetails principal
+      @AuthenticationPrincipal(errorOnInvalidType = true) CustomUserDetails principal
   ) {
     playlistService.removeContent(playlistId, contentId, principal.getUserId());
     return ResponseEntity.noContent().build();

@@ -30,7 +30,7 @@ public class FollowController implements FollowApi {
   @Override
   @PostMapping
   public ResponseEntity<FollowResponse> createFollow(
-      @AuthenticationPrincipal CustomUserDetails principal,
+      @AuthenticationPrincipal(errorOnInvalidType = true) CustomUserDetails principal,
       @Valid @RequestBody FollowRequest followRequest) {
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(followService.follow(followRequest, principal.getUserId()));
@@ -39,7 +39,7 @@ public class FollowController implements FollowApi {
   @Override
   @DeleteMapping("/{followId}")
   public ResponseEntity<Void> cancelFollow(
-      @AuthenticationPrincipal CustomUserDetails principal,
+      @AuthenticationPrincipal(errorOnInvalidType = true) CustomUserDetails principal,
       @PathVariable UUID followId) {
     followService.unFollow(followId, principal.getUserId());
     return ResponseEntity.noContent().build();
@@ -48,7 +48,7 @@ public class FollowController implements FollowApi {
   @Override
   @GetMapping("/followed-by-me")
   public ResponseEntity<FollowResponse> isFollowedByMe(
-      @AuthenticationPrincipal CustomUserDetails principal,
+      @AuthenticationPrincipal(errorOnInvalidType = true) CustomUserDetails principal,
       @RequestParam UUID followeeId) {
     return ResponseEntity.ok(followService.getFollowByMe(followeeId, principal.getUserId()));
   }

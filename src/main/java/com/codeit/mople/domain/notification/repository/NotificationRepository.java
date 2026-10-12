@@ -8,7 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface NotificationRepository extends JpaRepository<Notification, UUID>,
     NotificationRepositoryCustom {
 
-  long countByReceiver_Id(UUID receiverId);
+  long countByReceiverId(UUID receiverId);
 
-  List<Notification> findAllByReceiver_Id(UUID receiverId);
+  List<Notification> findAllByReceiverId(UUID receiverId);
 }

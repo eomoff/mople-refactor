@@ -31,7 +31,7 @@ public class ConversationController implements ConversationApi {
   @Override
   @PostMapping
   public ResponseEntity<ConversationDto> createConversation(
-      @AuthenticationPrincipal CustomUserDetails userDetails,
+      @AuthenticationPrincipal(errorOnInvalidType = true) CustomUserDetails userDetails,
       @Valid @RequestBody ConversationCreateRequest request
   ) {
     ConversationDto response = conversationService.findOrCreateConversation(userDetails.getUserId(),
@@ -42,7 +42,7 @@ public class ConversationController implements ConversationApi {
   @Override
   @GetMapping
   public ResponseEntity<CursorResponseConversationDto> findConversations(
-      @AuthenticationPrincipal CustomUserDetails userDetails,
+      @AuthenticationPrincipal(errorOnInvalidType = true) CustomUserDetails userDetails,
       @Valid ConversationCursorRequest request
   ) {
     CursorResponseConversationDto response = conversationService.getMyConversations(
@@ -54,7 +54,7 @@ public class ConversationController implements ConversationApi {
   @Override
   @GetMapping("/with")
   public ResponseEntity<ConversationDto> findConversationWithUser(
-      @AuthenticationPrincipal CustomUserDetails userDetails,
+      @AuthenticationPrincipal(errorOnInvalidType = true) CustomUserDetails userDetails,
       @RequestParam UUID userId
   ) {
     ConversationDto response = conversationService.getConversationWithUser(userDetails.getUserId(),
@@ -66,7 +66,7 @@ public class ConversationController implements ConversationApi {
   @Override
   @GetMapping("/{conversationId}")
   public ResponseEntity<ConversationDto> findConversation(
-      @AuthenticationPrincipal CustomUserDetails userDetails,
+      @AuthenticationPrincipal(errorOnInvalidType = true) CustomUserDetails userDetails,
       @PathVariable UUID conversationId
   ) {
     ConversationDto response = conversationService.getConversation(userDetails.getUserId(),

@@ -23,7 +23,7 @@ public class SseController implements SseApi {
   @Override
   @GetMapping(produces = MediaType.TEXT_EVENT_STREAM_VALUE)
   public SseEmitter connect(
-      @AuthenticationPrincipal CustomUserDetails userDetails,
+      @AuthenticationPrincipal(errorOnInvalidType = true) CustomUserDetails userDetails,
       @RequestParam(required = false) UUID lastEventId
   ) {
     return sseService.connect(userDetails.getUserId(), lastEventId);

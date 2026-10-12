@@ -40,7 +40,7 @@ public class WatchingSessionController implements WatchingSessionApi {
       @RequestParam(value = "limit", defaultValue = "10") int limit,
       @RequestParam(value = "sortDirection", defaultValue = "ASCENDING") String sortDirection,
       @RequestParam(value = "sortBy", defaultValue = "id") String sortBy,
-      @AuthenticationPrincipal CustomUserDetails userDetails) {
+      @AuthenticationPrincipal(errorOnInvalidType = true) CustomUserDetails userDetails) {
 
     //최신화된 시청자 목록을 조회하여 반환
     CursorResponseWatchingSessionDto response = watchingSessionService.getWatchingSessions(

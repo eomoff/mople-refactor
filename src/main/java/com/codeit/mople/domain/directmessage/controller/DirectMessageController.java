@@ -35,7 +35,7 @@ public class DirectMessageController implements DirectMessageApi {
   public void sendDirectMessage(
       @DestinationVariable UUID conversationId,
       @Valid DirectMessageSendRequest request,
-      @AuthenticationPrincipal CustomUserDetails userDetails
+      @AuthenticationPrincipal(errorOnInvalidType = true) CustomUserDetails userDetails
   ) {
     UUID senderId = userDetails.getUserId();
 
@@ -50,7 +50,7 @@ public class DirectMessageController implements DirectMessageApi {
   @GetMapping
   public ResponseEntity<CursorResponse<DirectMessageDto>> getDirectMessages(
       @PathVariable UUID conversationId,
-      @AuthenticationPrincipal CustomUserDetails userDetails,
+      @AuthenticationPrincipal(errorOnInvalidType = true) CustomUserDetails userDetails,
       @Valid DirectMessageCursorRequest request
   ) {
     CursorResponse<DirectMessageDto> response = directMessageService.getDirectMessages(
@@ -63,7 +63,7 @@ public class DirectMessageController implements DirectMessageApi {
   public ResponseEntity<Void> readMessage(
       @PathVariable UUID conversationId,
       @PathVariable UUID directMessageId,
-      @AuthenticationPrincipal CustomUserDetails userDetails
+      @AuthenticationPrincipal(errorOnInvalidType = true) CustomUserDetails userDetails
   ) {
     directMessageService.readMessage(conversationId, directMessageId, userDetails.getUserId());
     return ResponseEntity.noContent().build();
