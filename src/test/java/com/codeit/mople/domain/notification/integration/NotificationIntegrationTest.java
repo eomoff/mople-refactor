@@ -9,7 +9,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.codeit.mople.domain.auth.security.CustomUserDetails;
-import com.codeit.mople.domain.notification.entity.NotificationType;
 import com.codeit.mople.domain.user.entity.Role;
 import com.codeit.mople.global.config.SecurityConfig;
 import com.codeit.mople.global.jwt.JwtProvider;

@@ -6,7 +6,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import jakarta.persistence.PersistenceException;
 
 import com.codeit.mople.domain.notification.entity.Notification;
-import com.codeit.mople.domain.notification.entity.NotificationType;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.global.config.JpaAuditingConfig;
 import com.codeit.mople.global.config.QueryDslConfig;

@@ -1,67 +1,72 @@
 package com.codeit.mople.domain.notification.entity;
 
-import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.global.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.Index;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import java.util.Objects;
+import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
-@Table(name = "notifications",
-    indexes = @Index(name = "idx_notifications_receiver_id", columnList = "receiver_id"))
+@Table(name = "notifications")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Notification extends BaseEntity {
 
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "receiver_id", nullable = false)
-  private User receiver;
-
   @Column(nullable = false)
-  private String title;
+  private UUID receiverId;
 
-  @Column(columnDefinition = "TEXT")
-  private String content;
-
-  @Enumerated(EnumType.STRING)
+  @JdbcTypeCode(SqlTypes.JSON)
   @Column(nullable = false)
-  private NotificationLevel level;
+  private NotificationTemplate template;
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false)
   private NotificationType notificationType;
 
-  private Notification(User receiver, String title, String content,
-      NotificationLevel level, NotificationType notificationType) {
-    this.receiver = Objects.requireNonNull(receiver, "receiver");
-    this.title = Objects.requireNonNull(title, "title");
-    this.content = content;
-    this.level = Objects.requireNonNull(level, "level");
-    this.notificationType = Objects.requireNonNull(notificationType, "notificationType");
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false)
+  private NotificationLevel level;
+
+  @Column(nullable = false, unique = true)
+  private String hashId;
+
+  @Column
+  private Instant readAt;
+
+  private Notification(
+      UUID receiverId,
+      NotificationTemplate template,
+      NotificationType notificationType,
+      String hashId
+  ) {
+    this.receiverId = Objects.requireNonNull(receiverId, "receiverId");
+    this.template = Objects.requireNonNull(template, "template");
+    this.notificationType = Objects.requireNonNull(notificationType,"notificationType");
+    this.level = notificationType.getLevel();
+    this.hashId = Objects.requireNonNull(hashId, "hashId");
   }
 
-  public static Notification create(User receiver, String title, String content,
-      NotificationType notificationType) {
-    Objects.requireNonNull(notificationType, "notificationType");
-    NotificationLevel level = resolveLevel(notificationType);
-    return new Notification(receiver, title, content, level, notificationType);
+  public static Notification create(
+      UUID receiverId,
+      NotificationTemplate template,
+      NotificationType notificationType,
+      String hashId
+  ) {
+    return new Notification(receiverId, template, notificationType, hashId);
   }
 
-  private static NotificationLevel resolveLevel(NotificationType type) {
-    return switch (type) {
-      case ROLE_CHANGE, ACCOUNT_LOCKED -> NotificationLevel.WARNING;
-      case ACCOUNT_UNLOCKED, PLAYLIST_SUBSCRIBE, PLAYLIST_CONTENT_ADDED,
-           FOLLOWEE_ACTIVITY, NEW_FOLLOWER, DIRECT_MESSAGE -> NotificationLevel.INFO;
-    };
+  public void markAsRead() {
+    if (readAt == null) {
+      readAt = Instant.now();
+    }
   }
 }

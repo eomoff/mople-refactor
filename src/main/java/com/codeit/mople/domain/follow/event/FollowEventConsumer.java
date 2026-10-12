@@ -1,6 +1,5 @@
 package com.codeit.mople.domain.follow.event;
 
-import com.codeit.mople.domain.notification.entity.NotificationType;
 import com.codeit.mople.domain.notification.service.NotificationCreator;
 import com.codeit.mople.global.config.KafkaProperties;
 import com.codeit.mople.global.event.processed.ProcessedEventRepository;
