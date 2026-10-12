@@ -18,9 +18,9 @@ public record NotificationResponse(
     return new NotificationResponse(
         notification.getId(),
         notification.getCreatedAt(),
-        notification.getReceiver().getId(),
-        notification.getTitle(),
-        notification.getContent(),
+        notification.getReceiverId(),
+        notification.getTemplate().title(),
+        notification.getTemplate().content(),
         notification.getLevel()
     );
   }
