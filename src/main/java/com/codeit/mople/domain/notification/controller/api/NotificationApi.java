@@ -82,7 +82,7 @@ public interface NotificationApi {
           content = @Content(schema = @Schema(implementation = com.codeit.mople.global.response.ApiResponse.class))
       )
   })
-  ResponseEntity<Void> deleteNotification(
+  ResponseEntity<Void> readNotification(
       @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
       UUID notificationId);
 }
