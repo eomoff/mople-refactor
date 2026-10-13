@@ -6,7 +6,11 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
+import java.util.HexFormat;
 import java.util.Objects;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -50,7 +54,7 @@ public class Notification extends BaseEntity {
   ) {
     this.receiverId = Objects.requireNonNull(receiverId, "receiverId");
     this.template = Objects.requireNonNull(template, "template");
-    this.notificationType = Objects.requireNonNull(notificationType,"notificationType");
+    this.notificationType = Objects.requireNonNull(notificationType, "notificationType");
     this.level = notificationType.getLevel();
     this.hashId = Objects.requireNonNull(hashId, "hashId");
   }
@@ -67,6 +71,17 @@ public class Notification extends BaseEntity {
   public void markAsRead() {
     if (readAt == null) {
       readAt = Instant.now();
+    }
+  }
+
+  public static String hashIdOf(
+      UUID receiverId, NotificationType notificationType, String targetKey) {
+    try {
+      byte[] digest = MessageDigest.getInstance("SHA-256")
+          .digest((receiverId + ":" + notificationType + ":" + targetKey).getBytes(StandardCharsets.UTF_8));
+      return HexFormat.of().formatHex(digest);
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalStateException(e);
     }
   }
 }

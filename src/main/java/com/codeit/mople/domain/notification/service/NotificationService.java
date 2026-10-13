@@ -23,6 +23,7 @@ public class NotificationService {
 
   private final NotificationRepository notificationRepository;
 
+  // 알림 목록조회
   public CursorResponseNotificationDto getNotifications(UUID receiverId,
       NotificationCursorRequest request) {
     log.debug("알림 목록 조회 요청 - receiverId: {}, limit: {}, cursor: {}", receiverId,
@@ -49,7 +50,6 @@ public class NotificationService {
       nextIdAfter = lastItem.getId();
     }
 
-    // 알림은 삭제가 곧 읽음 처리이므로, 남아있는 개수가 곧 안 읽은 개수임 (API 응답 필드명은 totalCount로 유지)
     long unreadCount = notificationRepository.countByReceiver_Id(receiverId);
     log.info("알림 목록 조회 완료 - receiverId: {}", receiverId);
 
@@ -64,17 +64,21 @@ public class NotificationService {
     );
   }
 
+  // 알림 확인
   @Transactional
-  public void deleteNotification(UUID notificationId, UUID receiverId) {
-    log.debug("알림 삭제 요청 - notificationId: {}, receiverId: {}", notificationId, receiverId);
-    // 존재하지 않음(404)과 권한 없음(403)을 의도적으로 구분함 — id가 UUID라 열거(enumeration) 위험이 낮고,
-    // 디버깅 편의성과 클라이언트 UX(에러 메시지 구분)를 우선한 선택. 리소스 id가 노출/추측 가능해지면 재검토 필요.
+  public void readNotification(UUID notificationId, UUID receiverId) {
+    log.debug("알림 확인: notificationId={}, receiverId={}", notificationId, receiverId);
+    // 1. 알림이 존재하는지 조회
     Notification notification = notificationRepository.findById(notificationId)
         .orElseThrow(() -> new NotificationException(NotificationErrorCode.NOTIFICATION_NOT_FOUND));
-    if (!notification.getReceiver().getId().equals(receiverId)) {
+
+    // 2. 존재 확인한 알림의 수신자와 요청 수신자가 동일한지 검사
+    if (!notification.getReceiverId().equals(receiverId)) {
       throw new NotificationException(NotificationErrorCode.NOTIFICATION_FORBIDDEN);
     }
-    notificationRepository.delete(notification);
-    log.info("알림 삭제 완료 - notificationId: {}, receiverId: {}", notificationId, receiverId);
+
+    // 3. 알림 readAt 컬럼 기록
+    notification.markAsRead();
+    log.info("알림 확인 완료: notificationId={}, receiverId={}", notificationId, receiverId);
   }
 }

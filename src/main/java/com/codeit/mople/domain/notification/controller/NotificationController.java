@@ -26,21 +26,21 @@ public class NotificationController implements NotificationApi {
   @Override
   @GetMapping
   public ResponseEntity<CursorResponseNotificationDto> getNotifications(
-      @AuthenticationPrincipal(errorOnInvalidType = true) CustomUserDetails userDetails,
+      @AuthenticationPrincipal(errorOnInvalidType = true) CustomUserDetails principal,
       @Valid NotificationCursorRequest request
   ) {
     CursorResponseNotificationDto response = notificationService.getNotifications(
-        userDetails.getUserId(), request);
+        principal.getUserId(), request);
     return ResponseEntity.ok(response);
   }
 
   @Override
   @DeleteMapping("/{notificationId}")
-  public ResponseEntity<Void> deleteNotification(
-      @AuthenticationPrincipal(errorOnInvalidType = true) CustomUserDetails userDetails,
+  public ResponseEntity<Void> readNotification(
+      @AuthenticationPrincipal(errorOnInvalidType = true) CustomUserDetails principal,
       @PathVariable UUID notificationId
   ) {
-    notificationService.deleteNotification(notificationId, userDetails.getUserId());
+    notificationService.readNotification(notificationId, principal.getUserId());
     return ResponseEntity.noContent().build();
   }
 }

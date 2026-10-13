@@ -1,20 +1,17 @@
 package com.codeit.mople.domain.notification.service;
 
 import com.codeit.mople.domain.notification.entity.Notification;
+import com.codeit.mople.domain.notification.entity.NotificationTemplate;
+import com.codeit.mople.domain.notification.entity.NotificationType;
 import com.codeit.mople.domain.notification.event.NotificationCreatedEvent;
+import com.codeit.mople.domain.notification.exception.NotificationErrorCode;
+import com.codeit.mople.domain.notification.exception.NotificationException;
 import com.codeit.mople.domain.notification.repository.NotificationRepository;
-import com.codeit.mople.domain.user.entity.User;
-import com.codeit.mople.domain.user.exception.UserErrorCode;
-import com.codeit.mople.domain.user.exception.UserException;
 import com.codeit.mople.domain.user.repository.UserRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.dao.TransientDataAccessException;
-import org.springframework.retry.annotation.Backoff;
-import org.springframework.retry.annotation.Recover;
-import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,25 +25,34 @@ public class NotificationCreator {
 
   private final ApplicationEventPublisher eventPublisher;
 
-  @Retryable(retryFor = TransientDataAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 1000, multiplier = 2))
   @Transactional
-  public void createNotification(UUID receiverId, String title, String content,
-      NotificationType type) {
-    log.debug("알림 생성 요청 - receiverId: {}, type: {}", receiverId, type);
-    User receiver = userRepository.findById(receiverId)
-        .orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
-    Notification notification =
-        notificationRepository.save(Notification.create(receiver, title, content, type));
+  public void createNotification(
+      UUID receiverId,
+      NotificationTemplate template,
+      NotificationType type,
+      String targetKey
+  ) {
+    log.debug("알림 생성 요청: receiverId={}, type={}", receiverId, type);
+    // 1. 요청 받은 수신자id가 실제 존재하는지 검증
+    if (!userRepository.existsById(receiverId)) {
+      throw new NotificationException(NotificationErrorCode.NOTIFICATION_USER_NOT_FOUND);
+    }
 
+    // 2. 이미 생성된 알림이 존재하는지 검증
+    String hashId = Notification.hashIdOf(receiverId, type, targetKey);
+    if (notificationRepository.existsByHashId(hashId)) {
+      log.debug("중복 알림 생략: receiverId={}, type={}", receiverId, type);
+      return;
+    }
+
+    // 3. 알림 저장
+    Notification saved =
+        notificationRepository.save(Notification.create(receiverId, template, type, hashId));
+
+    // 4. 이벤트 발행
     eventPublisher.publishEvent(
-        new NotificationCreatedEvent(UUID.randomUUID(), notification.getCreatedAt(), receiverId,
-            notification.getId()));
-    log.info("알림 생성 완료 - receiverId: {}, type: {}", receiverId, type);
-  }
+        new NotificationCreatedEvent(UUID.randomUUID(), saved.getCreatedAt(), receiverId, saved.getId()));
 
-  @Recover
-  public void recoverCreateNotification(TransientDataAccessException e, UUID receiverId,
-      String title, String content, NotificationType type) {
-    log.error("알림 생성 최종 실패 (3회 재시도 소진) - receiverId: {}, type: {}", receiverId, type, e);
+    log.info("알림 생성 완료: receiverId={}, type={}", receiverId, type);
   }
 }
