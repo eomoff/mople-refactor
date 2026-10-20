@@ -3,7 +3,6 @@ package com.codeit.mople.global.config;
 import com.codeit.mople.global.error.CustomException;
 import com.codeit.mople.global.event.failure.ConsumeFailureMetricsListener;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.nio.charset.StandardCharsets;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.function.BiFunction;
 import lombok.extern.slf4j.Slf4j;
@@ -16,7 +15,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
-import org.springframework.kafka.core.KafkaOperations;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
@@ -81,7 +79,7 @@ public class KafkaConfig {
     // DeadLetterPublishingRecoverer -> 실패 전용 토픽에 던져넣는 기능(DLT로 메세지 보내줌)
     // Consumer가 실패했을 때 그 메세지를 (원래토픽명 + .dlt)로 재발행
     DeadLetterPublishingRecoverer recoverer =
-        new GroupAwareDeadLetterPublishingRecoverer(kafkaTemplate, DLT_DESTINATION_RESOLVER);
+        new DeadLetterPublishingRecoverer(kafkaTemplate, DLT_DESTINATION_RESOLVER);
 
     // Exponential : 지수
     // 지수백오프 구현을 위한 객체 생성
@@ -100,35 +98,6 @@ public class KafkaConfig {
     errorHandler.setRetryListeners(consumeFailureMetricsListener);
 
     return errorHandler;
-  }
-
-  // GroupId를 헤더에 추가하는 커스텀 DLT 리커버러
-  static class GroupAwareDeadLetterPublishingRecoverer extends DeadLetterPublishingRecoverer {
-
-    public GroupAwareDeadLetterPublishingRecoverer(
-        KafkaOperations<?, ?> template,
-        BiFunction<ConsumerRecord<?, ?>, Exception, TopicPartition> destinationResolver) {
-      super(template, destinationResolver);
-    }
-
-    @Override
-    public void accept(ConsumerRecord<?, ?> record,
-        org.apache.kafka.clients.consumer.Consumer<?, ?> consumer, Exception exception) {
-      String groupId = "UNKNOWN";
-
-      if (consumer != null) {
-        try {
-          groupId = consumer.groupMetadata().groupId();
-        } catch (Exception e) {
-          log.warn("Kafka Consumer 그룹 ID 추출 실패 - 기본값(UNKNOWN)으로 세팅", e);
-        }
-      }
-
-      // DLT로 가기 전 헤더에 안전하게 주입
-      record.headers().add("x-original-group-id", groupId.getBytes(StandardCharsets.UTF_8));
-
-      super.accept(record, consumer, exception);
-    }
   }
 
   @Bean
