@@ -50,8 +50,6 @@ spring:
 
     producer:
       acks: all
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       properties:
         spring.json.type.mapping: ${mople.kafka.type-mapping}
         enable.idempotence: true
@@ -62,10 +60,7 @@ spring:
         retry.backoff.max.ms: 4000
     consumer:
       group-id: mople
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
       properties:
-        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
         spring.json.trusted.packages: "com.codeit.mople.domain.*"
         spring.json.type.mapping: ${mople.kafka.type-mapping}
   mail:
