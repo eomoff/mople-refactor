@@ -1,5 +1,7 @@
 package com.codeit.mople.domain.playlist.event;
 
+import com.codeit.mople.domain.notification.entity.NotificationTemplate;
+import com.codeit.mople.domain.notification.entity.NotificationType;
 import com.codeit.mople.domain.notification.service.NotificationCreator;
 import com.codeit.mople.domain.playlist.service.PlaylistService;
 import com.codeit.mople.global.config.KafkaProperties;
@@ -42,9 +44,12 @@ public class PlaylistContentAddedEventConsumer {
     try {
       notificationCreator.createNotification(
           subscriberId,
-          "구독한 플레이리스트에 새 콘텐츠가 추가되었습니다.",
-          event.playlistTitle() + "에 새 콘텐츠가 추가되었습니다.",
-          NotificationType.PLAYLIST_CONTENT_ADDED
+          new NotificationTemplate(
+              "구독한 플레이리스트에 새 콘텐츠가 추가되었습니다.",
+              event.playlistTitle() + "에 새 콘텐츠가 추가되었습니다."
+          ),
+          NotificationType.PLAYLIST_CONTENT_ADDED,
+          event.playlistContentId().toString()
       );
     } catch (Exception e) {
       log.error("구독자 알림 생성 실패: subscriberId={}, playlistId={}", subscriberId, event.playlistId(),

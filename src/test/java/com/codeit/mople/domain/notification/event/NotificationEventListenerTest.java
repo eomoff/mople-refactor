@@ -1,5 +1,7 @@
 package com.codeit.mople.domain.notification.event;
 
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -7,6 +9,8 @@ import static org.mockito.Mockito.when;
 
 import com.codeit.mople.domain.directmessage.event.DirectMessageReceivedEvent;
 import com.codeit.mople.domain.follow.service.FollowService;
+import com.codeit.mople.domain.notification.entity.NotificationTemplate;
+import com.codeit.mople.domain.notification.entity.NotificationType;
 import com.codeit.mople.domain.notification.service.NotificationCreator;
 import com.codeit.mople.domain.playlist.event.PlaylistCreatedEvent;
 import com.codeit.mople.domain.playlist.event.PlaylistSubscribedEvent;
@@ -49,7 +53,7 @@ class NotificationEventListenerTest {
   }
 
   @Test
-  @DisplayName("권한 변경 이벤트 발생 시 ROLE_CHANGE 알림을 생성한다")
+  @DisplayName("권한 변경 이벤트 발생 시 ROLE_CHANGED 알림을 생성한다")
   void handle_role_change() {
     // given
     UserAccountStatusChangedEvent event = new UserAccountStatusChangedEvent(
@@ -63,17 +67,20 @@ class NotificationEventListenerTest {
 
     // then
     verify(notificationCreator).createNotification(
-        userId,
-        "권한이 변경되었습니다.",
-        "관리자에 의해 권한이 변경되었습니다. 다시 로그인해주세요.",
-        NotificationType.ROLE_CHANGE
+        eq(userId),
+        eq(new NotificationTemplate(
+            "권한이 변경되었습니다.",
+            "관리자에 의해 권한이 변경되었습니다. 다시 로그인해주세요."
+        )),
+        eq(NotificationType.ROLE_CHANGED),
+        anyString()
     );
 
     verifyNoMoreInteractions(notificationCreator);
   }
 
   @Test
-  @DisplayName("계정 잠금 이벤트 발생 시 ACCOUNT_LOCKED 알림을 생성한다")
+  @DisplayName("계정 잠금 이벤트 발생 시 알림을 생성하지 않는다")
   void handle_account_locked() {
     // given
     UserAccountStatusChangedEvent event = new UserAccountStatusChangedEvent(
@@ -86,18 +93,11 @@ class NotificationEventListenerTest {
     notificationEventListener.handleUserAccountStatusChanged(event);
 
     // then
-    verify(notificationCreator).createNotification(
-        userId,
-        "계정이 잠금되었습니다.",
-        "관리자에 의해 계정이 잠금되었습니다.",
-        NotificationType.ACCOUNT_LOCKED
-    );
-
-    verifyNoMoreInteractions(notificationCreator);
+    verifyNoInteractions(notificationCreator);
   }
 
   @Test
-  @DisplayName("계정 잠금 해제 이벤트 발생 시 ACCOUNT_UNLOCKED 알림을 생성한다")
+  @DisplayName("계정 잠금 해제 이벤트 발생 시 알림을 생성하지 않는다")
   void handle_account_unlocked() {
     // given
     UserAccountStatusChangedEvent event = new UserAccountStatusChangedEvent(
@@ -110,18 +110,11 @@ class NotificationEventListenerTest {
     notificationEventListener.handleUserAccountStatusChanged(event);
 
     // then
-    verify(notificationCreator).createNotification(
-        userId,
-        "계정 잠금이 해제되었습니다.",
-        "관리자에 의해 계정 잠금이 해제되었습니다.",
-        NotificationType.ACCOUNT_UNLOCKED
-    );
-
-    verifyNoMoreInteractions(notificationCreator);
+    verifyNoInteractions(notificationCreator);
   }
 
   @Test
-  @DisplayName("플레이리스트 구독 이벤트 발생 시 owner에게 PLAYLIST_SUBSCRIBE 알림을 생성한다")
+  @DisplayName("플레이리스트 구독 이벤트 발생 시 owner에게 PLAYLIST_SUBSCRIBED 알림을 생성한다")
   void handle_playlist_subscribed() {
     // given
     UUID eventId = UUID.randomUUID();
@@ -143,21 +136,26 @@ class NotificationEventListenerTest {
     // then
     verify(notificationCreator).createNotification(
         ownerId,
-        "플레이리스트에 새 구독자가 생겼습니다.",
-        "구독자유저님이 테스트 플레이리스트을(를) 구독했습니다.",
-        NotificationType.PLAYLIST_SUBSCRIBE
+        new NotificationTemplate(
+            "플레이리스트에 새 구독자가 생겼습니다.",
+            "구독자유저님이 테스트 플레이리스트을(를) 구독했습니다."
+        ),
+        NotificationType.PLAYLIST_SUBSCRIBED,
+        playlistId + ":" + subscriberId
     );
 
     verifyNoMoreInteractions(notificationCreator);
   }
 
   @Test
-  @DisplayName("DM 수신 이벤트 발생 시 수신자에게 DIRECT_MESSAGE 알림을 생성한다")
+  @DisplayName("DM 수신 이벤트 발생 시 수신자에게 DIRECT_MESSAGE_RECEIVED 알림을 생성한다")
   void handle_direct_message_received() {
     // given
+    UUID directMessageId = UUID.randomUUID();
     UUID receiverId = UUID.randomUUID();
 
     DirectMessageReceivedEvent event = new DirectMessageReceivedEvent(
+        directMessageId,
         receiverId,
         "발신자",
         "안녕하세요!"
@@ -169,9 +167,12 @@ class NotificationEventListenerTest {
     // then
     verify(notificationCreator).createNotification(
         receiverId,
-        "새로운 메시지가 도착했습니다.",
-        "발신자: 안녕하세요!",
-        NotificationType.DIRECT_MESSAGE
+        new NotificationTemplate(
+            "새로운 메시지가 도착했습니다.",
+            "발신자: 안녕하세요!"
+        ),
+        NotificationType.DIRECT_MESSAGE_RECEIVED,
+        directMessageId.toString()
     );
 
     verifyNoMoreInteractions(notificationCreator);
@@ -181,11 +182,13 @@ class NotificationEventListenerTest {
   @DisplayName("플레이리스트 생성 이벤트 발생 시 모든 팔로워에게 FOLLOWEE_ACTIVITY 알림을 생성한다")
   void handle_playlist_created() {
     // given
+    UUID playlistId = UUID.randomUUID();
     UUID ownerId = UUID.randomUUID();
     UUID followerA = UUID.randomUUID();
     UUID followerB = UUID.randomUUID();
 
     PlaylistCreatedEvent event = new PlaylistCreatedEvent(
+        playlistId,
         ownerId,
         "플레이리스트_생성자",
         "새 플레이리스트"
@@ -202,16 +205,22 @@ class NotificationEventListenerTest {
 
     verify(notificationCreator).createNotification(
         followerA,
-        "플레이리스트_생성자님의 새로운 활동이 있습니다.",
-        "새 플레이리스트를 만들었습니다.",
-        NotificationType.FOLLOWEE_ACTIVITY
+        new NotificationTemplate(
+            "플레이리스트_생성자님의 새로운 활동이 있습니다.",
+            "새 플레이리스트를 만들었습니다."
+        ),
+        NotificationType.FOLLOWEE_ACTIVITY,
+        playlistId.toString()
     );
 
     verify(notificationCreator).createNotification(
         followerB,
-        "플레이리스트_생성자님의 새로운 활동이 있습니다.",
-        "새 플레이리스트를 만들었습니다.",
-        NotificationType.FOLLOWEE_ACTIVITY
+        new NotificationTemplate(
+            "플레이리스트_생성자님의 새로운 활동이 있습니다.",
+            "새 플레이리스트를 만들었습니다."
+        ),
+        NotificationType.FOLLOWEE_ACTIVITY,
+        playlistId.toString()
     );
 
     verifyNoMoreInteractions(notificationCreator);
@@ -221,11 +230,13 @@ class NotificationEventListenerTest {
   @DisplayName("리뷰 작성 이벤트 발생 시 모든 팔로워에게 FOLLOWEE_ACTIVITY 알림을 생성한다")
   void handle_review_written() {
     // given
+    UUID reviewId = UUID.randomUUID();
     UUID authorId = UUID.randomUUID();
     UUID followerA = UUID.randomUUID();
     UUID followerB = UUID.randomUUID();
 
     ReviewWrittenEvent event = new ReviewWrittenEvent(
+        reviewId,
         authorId,
         "리뷰작성자"
     );
@@ -241,16 +252,22 @@ class NotificationEventListenerTest {
 
     verify(notificationCreator).createNotification(
         followerA,
-        "리뷰작성자님의 새로운 활동이 있습니다.",
-        "리뷰를 작성했습니다.",
-        NotificationType.FOLLOWEE_ACTIVITY
+        new NotificationTemplate(
+            "리뷰작성자님의 새로운 활동이 있습니다.",
+            "리뷰를 작성했습니다."
+        ),
+        NotificationType.FOLLOWEE_ACTIVITY,
+        reviewId.toString()
     );
 
     verify(notificationCreator).createNotification(
         followerB,
-        "리뷰작성자님의 새로운 활동이 있습니다.",
-        "리뷰를 작성했습니다.",
-        NotificationType.FOLLOWEE_ACTIVITY
+        new NotificationTemplate(
+            "리뷰작성자님의 새로운 활동이 있습니다.",
+            "리뷰를 작성했습니다."
+        ),
+        NotificationType.FOLLOWEE_ACTIVITY,
+        reviewId.toString()
     );
 
     verifyNoMoreInteractions(notificationCreator);
@@ -263,6 +280,7 @@ class NotificationEventListenerTest {
     UUID ownerId = UUID.randomUUID();
 
     PlaylistCreatedEvent event = new PlaylistCreatedEvent(
+        UUID.randomUUID(),
         ownerId,
         "플레이리스트_생성자",
         "새 플레이리스트"

@@ -4,6 +4,8 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
+import com.codeit.mople.domain.notification.entity.NotificationTemplate;
+import com.codeit.mople.domain.notification.entity.NotificationType;
 import com.codeit.mople.domain.notification.service.NotificationCreator;
 import com.codeit.mople.global.event.processed.ProcessedEventRepository;
 import java.time.Instant;
@@ -57,9 +59,12 @@ class FollowEventConsumerTest {
     verify(processedEventRepository).insertIfAbsent(eventId);
     verify(notificationCreator).createNotification(
         followeeId,
-        "새로운 팔로워가 생겼습니다.",
-        "팔로워님이 팔로우했습니다.",
-        NotificationType.NEW_FOLLOWER
+        new NotificationTemplate(
+            "새로운 팔로워가 생겼습니다.",
+            "팔로워님이 팔로우했습니다."
+        ),
+        NotificationType.FOLLOW_CREATED,
+        followerId.toString()
     );
   }
 

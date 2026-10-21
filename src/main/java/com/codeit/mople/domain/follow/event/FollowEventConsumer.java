@@ -1,5 +1,7 @@
 package com.codeit.mople.domain.follow.event;
 
+import com.codeit.mople.domain.notification.entity.NotificationTemplate;
+import com.codeit.mople.domain.notification.entity.NotificationType;
 import com.codeit.mople.domain.notification.service.NotificationCreator;
 import com.codeit.mople.global.config.KafkaProperties;
 import com.codeit.mople.global.event.processed.ProcessedEventRepository;
@@ -27,11 +29,15 @@ public class FollowEventConsumer {
       return;
     }
 
+    // 같은 사람이 다시 팔로우해도 알림은 한 번만 만든다.
     notificationCreator.createNotification(
         event.followeeId(),
-        "새로운 팔로워가 생겼습니다.",
-        event.followerName() + "님이 팔로우했습니다.",
-        NotificationType.NEW_FOLLOWER
+        new NotificationTemplate(
+            "새로운 팔로워가 생겼습니다.",
+            event.followerName() + "님이 팔로우했습니다."
+        ),
+        NotificationType.FOLLOW_CREATED,
+        event.followerId().toString()
     );
 
     log.info("팔로우 생성 이벤트 처리 완료: followId={}", event.followId());

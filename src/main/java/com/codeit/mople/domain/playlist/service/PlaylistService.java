@@ -110,7 +110,8 @@ public class PlaylistService {
         savedPlaylist.getId(), owner.getId());
 
     publisher.publishEvent(
-        new PlaylistCreatedEvent(ownerId, owner.getName(), savedPlaylist.getTitle())
+        new PlaylistCreatedEvent(savedPlaylist.getId(), ownerId, owner.getName(),
+            savedPlaylist.getTitle())
     );
 
     publisher.publishEvent(

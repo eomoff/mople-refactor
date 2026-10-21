@@ -91,7 +91,8 @@ public class ReviewService {
 
     Review savedReview = reviewRepository.save(review);
 
-    eventPublisher.publishEvent(new ReviewWrittenEvent(authorId, author.getName()));
+    eventPublisher.publishEvent(
+        new ReviewWrittenEvent(savedReview.getId(), authorId, author.getName()));
 
     eventPublisher.publishEvent(new ReviewCreatedEvent(
         UUID.randomUUID(),

@@ -5,7 +5,6 @@ import static org.awaitility.Awaitility.await;
 
 import com.codeit.mople.domain.auth.repository.SessionTokenRepository;
 import com.codeit.mople.domain.auth.security.CustomUserDetails;
-import com.codeit.mople.domain.notification.repository.NotificationRepository;
 import com.codeit.mople.domain.user.admin.service.AdminService;
 import com.codeit.mople.domain.user.entity.Role;
 import com.codeit.mople.domain.user.entity.User;
@@ -76,9 +75,6 @@ class WebSocketForceLogoutIntegrationTest {
   private AdminService adminService;
 
   @Autowired
-  private NotificationRepository notificationRepository;
-
-  @Autowired
   private SimpMessagingTemplate messagingTemplate;
 
   private User targetUser;
@@ -102,12 +98,6 @@ class WebSocketForceLogoutIntegrationTest {
   @AfterEach
   void tearDown() {
     SecurityContextHolder.clearContext();
-    // 같은 UserAccountStatusChangedEvent를 NotificationEventListener도 비동기로 구독해 알림을
-    // 저장한다. 그 저장이 끝나기 전에 유저를 지우면 FK 제약 위반이 나므로 먼저 기다린다.
-    await().atMost(5, TimeUnit.SECONDS)
-        .until(() -> notificationRepository.countByReceiver_Id(targetUser.getId()) >= 1);
-    notificationRepository.deleteAll(
-        notificationRepository.findAllByReceiver_Id(targetUser.getId()));
     userRepository.delete(targetUser);
   }
 

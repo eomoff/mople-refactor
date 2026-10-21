@@ -6,6 +6,8 @@ import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
+import com.codeit.mople.domain.notification.entity.NotificationTemplate;
+import com.codeit.mople.domain.notification.entity.NotificationType;
 import com.codeit.mople.domain.notification.service.NotificationCreator;
 import com.codeit.mople.domain.playlist.service.PlaylistService;
 import com.codeit.mople.domain.user.exception.UserErrorCode;
@@ -72,15 +74,21 @@ class PlaylistContentAddedEventConsumerTest {
     verify(processedEventRepository).insertIfAbsent(eventId);
     verify(notificationCreator).createNotification(
         subscriberA,
-        "구독한 플레이리스트에 새 콘텐츠가 추가되었습니다.",
-        "테스트 플레이리스트에 새 콘텐츠가 추가되었습니다.",
-        NotificationType.PLAYLIST_CONTENT_ADDED
+        new NotificationTemplate(
+            "구독한 플레이리스트에 새 콘텐츠가 추가되었습니다.",
+            "테스트 플레이리스트에 새 콘텐츠가 추가되었습니다."
+        ),
+        NotificationType.PLAYLIST_CONTENT_ADDED,
+        playlistContentId.toString()
     );
     verify(notificationCreator).createNotification(
         subscriberB,
-        "구독한 플레이리스트에 새 콘텐츠가 추가되었습니다.",
-        "테스트 플레이리스트에 새 콘텐츠가 추가되었습니다.",
-        NotificationType.PLAYLIST_CONTENT_ADDED
+        new NotificationTemplate(
+            "구독한 플레이리스트에 새 콘텐츠가 추가되었습니다.",
+            "테스트 플레이리스트에 새 콘텐츠가 추가되었습니다."
+        ),
+        NotificationType.PLAYLIST_CONTENT_ADDED,
+        playlistContentId.toString()
     );
   }
 
@@ -99,9 +107,12 @@ class PlaylistContentAddedEventConsumerTest {
     willThrow(new UserException(UserErrorCode.USER_NOT_FOUND))
         .given(notificationCreator).createNotification(
             subscriberA,
-            "구독한 플레이리스트에 새 콘텐츠가 추가되었습니다.",
-            "테스트 플레이리스트에 새 콘텐츠가 추가되었습니다.",
-            NotificationType.PLAYLIST_CONTENT_ADDED
+            new NotificationTemplate(
+                "구독한 플레이리스트에 새 콘텐츠가 추가되었습니다.",
+                "테스트 플레이리스트에 새 콘텐츠가 추가되었습니다."
+            ),
+            NotificationType.PLAYLIST_CONTENT_ADDED,
+            playlistContentId.toString()
         );
 
     // when & then
@@ -109,9 +120,12 @@ class PlaylistContentAddedEventConsumerTest {
 
     verify(notificationCreator).createNotification(
         subscriberB,
-        "구독한 플레이리스트에 새 콘텐츠가 추가되었습니다.",
-        "테스트 플레이리스트에 새 콘텐츠가 추가되었습니다.",
-        NotificationType.PLAYLIST_CONTENT_ADDED
+        new NotificationTemplate(
+            "구독한 플레이리스트에 새 콘텐츠가 추가되었습니다.",
+            "테스트 플레이리스트에 새 콘텐츠가 추가되었습니다."
+        ),
+        NotificationType.PLAYLIST_CONTENT_ADDED,
+        playlistContentId.toString()
     );
   }
 

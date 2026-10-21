@@ -83,7 +83,8 @@ public class DirectMessageService {
         new DirectMessageLastReadAtEvent(conversationId, senderId, directMessage.getCreatedAt()));
 
     publisher.publishEvent(
-        new DirectMessageReceivedEvent(receiver.getId(), sender.getName(), content));
+        new DirectMessageReceivedEvent(directMessage.getId(), receiver.getId(), sender.getName(),
+            content));
 
     DirectMessageDto responseDto = DirectMessageDto.from(directMessage);
 
