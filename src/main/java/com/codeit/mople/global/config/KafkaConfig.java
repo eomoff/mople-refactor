@@ -16,6 +16,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.core.ProducerFactory;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.ExponentialBackOffWithMaxRetries;
@@ -72,14 +73,16 @@ public class KafkaConfig {
 
   @Bean
   public DefaultErrorHandler kafkaErrorHandler(
-      KafkaTemplate<String, Object> kafkaTemplate,
+      ProducerFactory<Object, Object> producerFactory,
       ConsumeFailureMetricsListener consumeFailureMetricsListener
   ) {
 
     // DeadLetterPublishingRecoverer -> 실패 전용 토픽에 던져넣는 기능(DLT로 메세지 보내줌)
     // Consumer가 실패했을 때 그 메세지를 (원래토픽명 + .dlt)로 재발행
-    DeadLetterPublishingRecoverer recoverer =
-        new DeadLetterPublishingRecoverer(kafkaTemplate, DLT_DESTINATION_RESOLVER);
+    // DLT 발행 실패는 컨슈머 재시도와 ConsumeFailureMetricsListener가 처리하므로,
+    // 발행 실패를 Redis에 기록하는 리스너가 붙은 자동 설정 템플릿 대신 전용 템플릿으로 보냄
+    DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(
+        new KafkaTemplate<>(producerFactory), DLT_DESTINATION_RESOLVER);
 
     // Exponential : 지수
     // 지수백오프 구현을 위한 객체 생성

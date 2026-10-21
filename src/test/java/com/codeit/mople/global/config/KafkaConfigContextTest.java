@@ -15,8 +15,6 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 
-// 자동 설정이 만들어줄 기본 KafkaTemplate을 직접 작성,정의한 빈으로 밀어내는 구조라,
-// enabled=true일 때 템플릿 두 개가 제대로 올라오는지, enabled=false일 때는 자동 설정으로 잘 돌아가는지 확인하는 테스트
 @DisplayName("KafkaConfig 컨텍스트 테스트")
 class KafkaConfigContextTest {
 

@@ -7,7 +7,6 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 
 import com.codeit.mople.global.config.KafkaProperties;
-import com.codeit.mople.global.event.KafkaEventPublisher;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,6 +18,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.kafka.core.KafkaTemplate;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("팔로우 생성 이벤트 Kafka 발행 테스트")
@@ -27,7 +27,7 @@ class FollowEventProducerTest {
   private static final String TOPIC = "mople.follow.created.v1";
 
   @Mock
-  KafkaEventPublisher publisher;
+  KafkaTemplate<String, Object> kafkaTemplate;
 
   @Captor
   ArgumentCaptor<FollowCreatedEvent> eventCaptor;
@@ -59,7 +59,7 @@ class FollowEventProducerTest {
         )
     );
 
-    producer = new FollowEventProducer(publisher, properties);
+    producer = new FollowEventProducer(kafkaTemplate, properties);
 
     followId = UUID.randomUUID();
     followeeId = UUID.randomUUID();
@@ -79,7 +79,7 @@ class FollowEventProducerTest {
       producer.on(event);
 
       // then
-      verify(publisher).publish(eq(TOPIC),
+      verify(kafkaTemplate).send(eq(TOPIC),
           anyString(), eventCaptor.capture());
     }
 
@@ -90,7 +90,7 @@ class FollowEventProducerTest {
       producer.on(event);
 
       // then
-      verify(publisher).publish(eq(TOPIC), eq(followeeId.toString()),
+      verify(kafkaTemplate).send(eq(TOPIC), eq(followeeId.toString()),
           any(FollowCreatedEvent.class));
     }
 
@@ -101,7 +101,7 @@ class FollowEventProducerTest {
       producer.on(event);
 
       // then
-      verify(publisher).publish(eq(TOPIC),
+      verify(kafkaTemplate).send(eq(TOPIC),
           anyString(), eventCaptor.capture());
 
       FollowCreatedEvent published = eventCaptor.getValue();

@@ -1,9 +1,9 @@
 package com.codeit.mople.domain.playlist.event;
 
 import com.codeit.mople.global.config.KafkaProperties;
-import com.codeit.mople.global.event.KafkaEventPublisher;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -13,12 +13,12 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @ConditionalOnProperty(prefix = KafkaProperties.PREFIX, name = "enabled", havingValue = "true")
 public class PlaylistContentAddedEventProducer {
 
-  private final KafkaEventPublisher publisher;
+  private final KafkaTemplate<String, Object> kafkaTemplate;
   private final String topic;
 
-  public PlaylistContentAddedEventProducer(KafkaEventPublisher publisher,
+  public PlaylistContentAddedEventProducer(KafkaTemplate<String, Object> kafkaTemplate,
       KafkaProperties kafkaProperties) {
-    this.publisher = publisher;
+    this.kafkaTemplate = kafkaTemplate;
     this.topic = kafkaProperties.topics().playlistContentAdded();
   }
 
@@ -28,6 +28,6 @@ public class PlaylistContentAddedEventProducer {
 
     log.debug("플레이리스트 콘텐츠 추가 이벤트 발행: playlistContentId={}, playlistId={}, eventId={}",
         event.playlistContentId(), event.playlistId(), event.eventId());
-    publisher.publish(topic, key, event);
+    kafkaTemplate.send(topic, key, event);
   }
 }

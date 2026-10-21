@@ -3,9 +3,10 @@ package com.codeit.mople.domain.follow.event;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.codeit.mople.domain.follow.dto.FollowRequest;
 import com.codeit.mople.domain.follow.repository.FollowRepository;
@@ -13,7 +14,6 @@ import com.codeit.mople.domain.follow.service.FollowService;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.repository.UserRepository;
 import com.codeit.mople.global.config.KafkaProperties;
-import com.codeit.mople.global.event.KafkaEventPublisher;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,6 +24,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -39,13 +40,13 @@ class FollowCreatedEventPublishTest {
 
     @Bean
     FollowEventProducer followEventProducer(
-        KafkaEventPublisher publisher, KafkaProperties kafkaProperties) {
-      return new FollowEventProducer(publisher, kafkaProperties);
+        KafkaTemplate<String, Object> kafkaTemplate, KafkaProperties kafkaProperties) {
+      return new FollowEventProducer(kafkaTemplate, kafkaProperties);
     }
   }
 
   @MockitoBean
-  KafkaEventPublisher kafkaEventPublisher;
+  KafkaTemplate<String, Object> kafkaTemplate;
 
   @Autowired
   FollowService followService;
@@ -89,7 +90,7 @@ class FollowCreatedEventPublishTest {
     followService.follow(new FollowRequest(followeeId), followerId);
 
     // then
-    verify(kafkaEventPublisher).publish(
+    verify(kafkaTemplate).send(
         eq(kafkaProperties.topics().followCreated()),
         eq(followeeId.toString()),
         any(FollowCreatedEvent.class));
@@ -105,7 +106,7 @@ class FollowCreatedEventPublishTest {
     })).isInstanceOf(IllegalStateException.class);
 
     // then
-    verifyNoInteractions(kafkaEventPublisher);
+    verify(kafkaTemplate, never()).send(anyString(), anyString(), any());
     assertThat(followRepository.findByFolloweeIdAndFollowerId(followeeId, followerId)).isEmpty();
   }
 }

@@ -1,9 +1,9 @@
 package com.codeit.mople.domain.follow.event;
 
 import com.codeit.mople.global.config.KafkaProperties;
-import com.codeit.mople.global.event.KafkaEventPublisher;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -13,11 +13,14 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @ConditionalOnProperty(prefix = KafkaProperties.PREFIX, name = "enabled", havingValue = "true")
 public class FollowEventProducer {
 
-  private final KafkaEventPublisher publisher;
+  private final KafkaTemplate<String, Object> kafkaTemplate;
   private final String topic;
 
-  public FollowEventProducer(KafkaEventPublisher publisher, KafkaProperties kafkaProperties) {
-    this.publisher = publisher;
+  public FollowEventProducer(
+      KafkaTemplate<String, Object> kafkaTemplate,
+      KafkaProperties kafkaProperties
+  ) {
+    this.kafkaTemplate = kafkaTemplate;
     this.topic = kafkaProperties.topics().followCreated();
   }
 
@@ -27,6 +30,6 @@ public class FollowEventProducer {
 
     log.debug("팔로우 생성 이벤트 발행: followId={}, eventId={}",
         event.followId(), event.eventId());
-    publisher.publish(topic, key, event);
+    kafkaTemplate.send(topic, key, event);
   }
 }
