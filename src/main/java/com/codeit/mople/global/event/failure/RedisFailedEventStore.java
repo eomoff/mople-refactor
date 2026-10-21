@@ -19,7 +19,6 @@ public class RedisFailedEventStore implements FailedEventStore {
   private static final String KEY_SUFFIX = ":kafka:events:failed";
   private static final String FIELD_TOPIC = "topic";
   private static final String FIELD_KEY = "key";
-  private static final String FIELD_EVENT_ID = "eventId";
   private static final String FIELD_EVENT_TYPE = "eventType";
   private static final String FIELD_DATA = "data";
   private static final String FIELD_ERROR = "error";
@@ -46,8 +45,8 @@ public class RedisFailedEventStore implements FailedEventStore {
       // sizeLimitOptions(): 저장하면서 적용할 옵션
       redisTemplate.opsForStream().add(streamKey, toFields(event), sizeLimitOptions());
     } catch (Exception e) {
-      log.error("실패 이벤트 적재 실패: topic={}, eventId={}, eventType={}",
-          event.topic(), event.eventId(), event.eventType(), e);
+      log.error("실패 이벤트 적재 실패: topic={}, eventType={}",
+          event.topic(), event.eventType(), e);
     }
   }
 
@@ -56,7 +55,6 @@ public class RedisFailedEventStore implements FailedEventStore {
     return Map.of(
         FIELD_TOPIC, event.topic(),
         FIELD_KEY, event.key(),
-        FIELD_EVENT_ID, String.valueOf(event.eventId()),
         FIELD_EVENT_TYPE, event.eventType(),
         FIELD_DATA, event.data(),
         FIELD_ERROR, event.error()

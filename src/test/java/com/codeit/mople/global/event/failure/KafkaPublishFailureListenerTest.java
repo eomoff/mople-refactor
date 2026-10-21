@@ -6,7 +6,6 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-import com.codeit.mople.global.event.PublishableEvent;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -33,7 +32,7 @@ class KafkaPublishFailureListenerTest {
   static final String TOPIC = "mople.follow.created.v1";
   static final String KEY = "followee-key";
 
-  record TestEvent(UUID eventId, Instant occurredAt) implements PublishableEvent {
+  record TestEvent(UUID eventId, Instant occurredAt) {
 
   }
 
@@ -82,7 +81,6 @@ class KafkaPublishFailureListenerTest {
       FailedEvent saved = failedEventCaptor.getValue();
       assertThat(saved.topic()).isEqualTo(TOPIC);
       assertThat(saved.key()).isEqualTo(KEY);
-      assertThat(saved.eventId()).isEqualTo(event.eventId());
       assertThat(saved.eventType()).isEqualTo(TestEvent.class.getName());
       assertThat(saved.data()).isEqualTo("{\"eventId\":\"test\"}");
       assertThat(saved.error()).isEqualTo("broker down");
@@ -104,7 +102,6 @@ class KafkaPublishFailureListenerTest {
 
       FailedEvent saved = failedEventCaptor.getValue();
       assertThat(saved.data()).isEmpty();
-      assertThat(saved.eventId()).isEqualTo(event.eventId());
       assertThat(saved.eventType()).isEqualTo(TestEvent.class.getName());
     }
 

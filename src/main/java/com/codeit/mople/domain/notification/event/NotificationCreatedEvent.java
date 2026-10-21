@@ -1,6 +1,5 @@
 package com.codeit.mople.domain.notification.event;
 
-import com.codeit.mople.global.event.PublishableEvent;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -9,6 +8,6 @@ public record NotificationCreatedEvent(
     Instant occurredAt,
     UUID receiverId,
     UUID notificationId
-) implements PublishableEvent {
+) {
 
 }

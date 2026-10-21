@@ -10,7 +10,6 @@ import static org.mockito.Mockito.verify;
 
 import java.time.Duration;
 import java.util.Map;
-import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -53,17 +52,14 @@ class RedisFailedEventStoreTest {
 
   RedisFailedEventStore store;
 
-  UUID eventId;
   FailedEvent event;
 
   @BeforeEach
   void setUp() {
     store = new RedisFailedEventStore(redisTemplate, NAMESPACE, MAX_ENTRIES);
-    eventId = UUID.randomUUID();
     event = new FailedEvent(
         "mople.follow.created.v1",
         "followee-key",
-        eventId,
         EVENT_TYPE,
         "{\"followId\":\"test\"}",
         "broker down"
@@ -89,7 +85,6 @@ class RedisFailedEventStoreTest {
           eq(Map.of(
               "topic", "mople.follow.created.v1",
               "key", "followee-key",
-              "eventId", eventId.toString(),
               "eventType", EVENT_TYPE,
               "data", "{\"followId\":\"test\"}",
               "error", "broker down"
@@ -125,7 +120,6 @@ class RedisFailedEventStoreTest {
       FailedEvent noKey = new FailedEvent(
           "mople.notification.created.v1",
           "",
-          eventId,
           EVENT_TYPE,
           "{}",
           "broker down"

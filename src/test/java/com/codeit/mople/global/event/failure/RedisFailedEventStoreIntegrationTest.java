@@ -3,7 +3,6 @@ package com.codeit.mople.global.event.failure;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
-import java.util.UUID;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -64,24 +63,20 @@ class RedisFailedEventStoreIntegrationTest {
   }
 
   FailedEvent failedEvent(String key) {
-    return new FailedEvent(TOPIC, key, UUID.randomUUID(), EVENT_TYPE, DATA, "broker down");
+    return new FailedEvent(TOPIC, key, EVENT_TYPE, DATA, "broker down");
   }
 
   @Test
   @DisplayName("적재한 이벤트가 프로파일 네임스페이스를 붙인 스트림 키에 실제로 쌓이는지")
   void savesToNamespacedStream() {
-    // given
-    UUID eventId = UUID.randomUUID();
-
     // when
-    store.save(new FailedEvent(TOPIC, "followee-key", eventId, EVENT_TYPE, DATA, "broker down"));
+    store.save(new FailedEvent(TOPIC, "followee-key", EVENT_TYPE, DATA, "broker down"));
 
     // then
     assertThat(readAll()).singleElement().satisfies(record ->
         assertThat(record.getValue())
             .containsEntry("topic", TOPIC)
             .containsEntry("key", "followee-key")
-            .containsEntry("eventId", eventId.toString())
             .containsEntry("eventType", EVENT_TYPE)
             .containsEntry("data", DATA)
             .containsEntry("error", "broker down"));

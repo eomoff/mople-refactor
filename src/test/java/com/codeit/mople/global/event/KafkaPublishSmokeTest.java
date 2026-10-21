@@ -18,6 +18,7 @@ import com.codeit.mople.domain.review.event.ReviewCreatedEvent;
 import com.codeit.mople.domain.review.event.ReviewDeletedEvent;
 import com.codeit.mople.domain.review.event.ReviewUpdatedEvent;
 import com.codeit.mople.domain.user.event.UserSearchIndexEvent;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -89,6 +90,9 @@ class KafkaPublishSmokeTest {
 
   @Autowired
   EmbeddedKafkaBroker embeddedKafka;
+
+  @Autowired
+  ObjectMapper objectMapper;
 
   private Consumer<String, String> consumerFor(String topic) {
     Map<String, Object> props =
@@ -263,7 +267,7 @@ class KafkaPublishSmokeTest {
     @ParameterizedTest(name = "{2}")
     @MethodSource("events")
     @DisplayName("커밋 뒤 제 토픽으로 나가고 헤더에 제 타입 이름이 실리는지")
-    void publishesWithTypeName(PublishableEvent event, String topic, String typeName) {
+    void publishesWithTypeName(Object event, String topic, String typeName) throws Exception {
       try (Consumer<String, String> consumer = consumerFor(topic)) {
         // when
         transactionTemplate.executeWithoutResult(status -> eventPublisher.publishEvent(event));
@@ -273,7 +277,7 @@ class KafkaPublishSmokeTest {
             KafkaTestUtils.getSingleRecord(consumer, topic, Duration.ofSeconds(10));
 
         assertThat(typeIdOf(record)).isEqualTo(typeName);
-        assertThat(record.value()).contains(event.eventId().toString());
+        assertThat(record.value()).isEqualTo(objectMapper.writeValueAsString(event));
       }
     }
   }

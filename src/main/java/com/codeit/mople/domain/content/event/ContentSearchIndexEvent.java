@@ -1,7 +1,6 @@
 package com.codeit.mople.domain.content.event;
 
 import com.codeit.mople.domain.content.entity.ContentType;
-import com.codeit.mople.global.event.PublishableEvent;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -14,6 +13,6 @@ public record ContentSearchIndexEvent(
     double rating,
     long watcherCount,
     Instant createdAt
-) implements PublishableEvent {
+) {
 
 }

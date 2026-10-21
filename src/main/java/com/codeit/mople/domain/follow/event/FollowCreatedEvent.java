@@ -1,6 +1,5 @@
 package com.codeit.mople.domain.follow.event;
 
-import com.codeit.mople.global.event.PublishableEvent;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -11,6 +10,6 @@ public record FollowCreatedEvent(
     UUID followeeId,
     UUID followerId,
     String followerName
-) implements PublishableEvent {
+) {
 
 }

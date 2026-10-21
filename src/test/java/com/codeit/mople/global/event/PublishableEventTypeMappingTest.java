@@ -2,6 +2,7 @@ package com.codeit.mople.global.event;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.codeit.mople.global.config.KafkaProperties;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
@@ -14,12 +15,17 @@ import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.config.YamlPropertiesFactoryBean;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.core.type.filter.AssignableTypeFilter;
+import org.springframework.core.type.filter.AnnotationTypeFilter;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.mock.env.MockEnvironment;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionalEventListener;
+import org.springframework.util.ClassUtils;
 
 @DisplayName("타입 이름 매핑 테스트")
 class PublishableEventTypeMappingTest {
 
-  static final String DOMAIN_PACKAGE = "com.codeit.mople.domain";
+  static final String BASE_PACKAGE = "com.codeit.mople";
   static final String MAPPING_KEY = "mople.kafka.type-mapping";
 
   static List<String> entries;
@@ -39,14 +45,27 @@ class PublishableEventTypeMappingTest {
         .toList();
   }
 
+  // 프로듀서는 Kafka가 켜졌을 때만 빈이 되므로 켜진 환경으로 스캔하고,
+  // KafkaTemplate을 가진 빈이 받아서 그대로 보내는 이벤트를 발행 이벤트로 봄
   private Set<String> publishableEventNames() {
     ClassPathScanningCandidateComponentProvider scanner =
-        new ClassPathScanningCandidateComponentProvider(false);
-    scanner.addIncludeFilter(new AssignableTypeFilter(PublishableEvent.class));
+        new ClassPathScanningCandidateComponentProvider(false,
+            new MockEnvironment().withProperty(KafkaProperties.PREFIX + ".enabled", "true"));
+    scanner.addIncludeFilter(new AnnotationTypeFilter(Component.class));
 
-    return scanner.findCandidateComponents(DOMAIN_PACKAGE).stream()
+    return scanner.findCandidateComponents(BASE_PACKAGE).stream()
         .map(BeanDefinition::getBeanClassName)
+        .map(className -> ClassUtils.resolveClassName(className, null))
+        .filter(this::sendsToKafka)
+        .flatMap(type -> Arrays.stream(type.getDeclaredMethods()))
+        .filter(method -> method.isAnnotationPresent(TransactionalEventListener.class))
+        .map(method -> method.getParameterTypes()[0].getName())
         .collect(Collectors.toSet());
+  }
+
+  private boolean sendsToKafka(Class<?> type) {
+    return Arrays.stream(type.getDeclaredFields())
+        .anyMatch(field -> field.getType() == KafkaTemplate.class);
   }
 
   private String aliasOf(String entry) {
