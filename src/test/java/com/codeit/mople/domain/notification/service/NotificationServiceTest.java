@@ -17,8 +17,9 @@ import com.codeit.mople.domain.notification.exception.NotificationException;
 import com.codeit.mople.domain.notification.dto.response.CursorResponseNotificationDto;
 import com.codeit.mople.domain.notification.entity.Notification;
 import com.codeit.mople.domain.notification.entity.NotificationLevel;
+import com.codeit.mople.domain.notification.entity.NotificationTemplate;
+import com.codeit.mople.domain.notification.entity.NotificationType;
 import com.codeit.mople.domain.notification.repository.NotificationRepository;
-import com.codeit.mople.domain.user.entity.User;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -70,10 +71,10 @@ class NotificationServiceTest {
       Notification n2 = mockNotification(id2, "역할 변경", "역할이 변경됐습니다.", NotificationLevel.WARNING,
           createdAt2);
 
-      given(notificationRepository.findNotificationByCursor(eq(receiverId), isNull(), isNull(),
-          eq(20)))
+      given(notificationRepository.findUnreadNotificationByCursor(eq(receiverId), isNull(),
+          isNull(), eq(20)))
           .willReturn(List.of(n1, n2));
-      given(notificationRepository.countByReceiver_Id(receiverId)).willReturn(2L);
+      given(notificationRepository.countByReceiverIdAndReadAtIsNull(receiverId)).willReturn(2L);
 
       // when
       CursorResponseNotificationDto result = notificationService.getNotifications(receiverId,
@@ -120,10 +121,10 @@ class NotificationServiceTest {
           lastItemTime);
       Notification n3 = mock(Notification.class); // limit+1번째 — 슬라이싱으로 제외되어 필드 접근 없음
 
-      given(notificationRepository.findNotificationByCursor(eq(receiverId), isNull(), isNull(),
-          eq(2)))
+      given(notificationRepository.findUnreadNotificationByCursor(eq(receiverId), isNull(),
+          isNull(), eq(2)))
           .willReturn(List.of(n1, n2, n3));
-      given(notificationRepository.countByReceiver_Id(receiverId)).willReturn(3L);
+      given(notificationRepository.countByReceiverIdAndReadAtIsNull(receiverId)).willReturn(3L);
 
       // when
       CursorResponseNotificationDto result = notificationService.getNotifications(receiverId,
@@ -134,7 +135,7 @@ class NotificationServiceTest {
       assertThat(result.hasNext()).isTrue();
       assertThat(result.nextCursor()).isEqualTo(lastItemTime.toString());
       assertThat(result.nextIdAfter()).isEqualTo(lastItemId);
-      // totalCount는 현재 페이지 크기가 아닌 전체 알림 개수
+      // totalCount는 현재 페이지 크기가 아닌 안 읽은 알림 개수
       assertThat(result.totalCount()).isEqualTo(3);
     }
 
@@ -150,10 +151,10 @@ class NotificationServiceTest {
       Notification n2 = mockNotification(UUID.randomUUID(), "알림2", "내용", NotificationLevel.INFO,
           Instant.now());
 
-      given(notificationRepository.findNotificationByCursor(eq(receiverId), isNull(), isNull(),
-          eq(2)))
+      given(notificationRepository.findUnreadNotificationByCursor(eq(receiverId), isNull(),
+          isNull(), eq(2)))
           .willReturn(List.of(n1, n2));
-      given(notificationRepository.countByReceiver_Id(receiverId)).willReturn(2L);
+      given(notificationRepository.countByReceiverIdAndReadAtIsNull(receiverId)).willReturn(2L);
 
       // when
       CursorResponseNotificationDto result = notificationService.getNotifications(receiverId,
@@ -174,10 +175,10 @@ class NotificationServiceTest {
       NotificationCursorRequest request = new NotificationCursorRequest(
           null, null, 20);
 
-      given(notificationRepository.findNotificationByCursor(eq(receiverId), isNull(), isNull(),
-          eq(20)))
+      given(notificationRepository.findUnreadNotificationByCursor(eq(receiverId), isNull(),
+          isNull(), eq(20)))
           .willReturn(List.of());
-      given(notificationRepository.countByReceiver_Id(receiverId)).willReturn(0L);
+      given(notificationRepository.countByReceiverIdAndReadAtIsNull(receiverId)).willReturn(0L);
 
       // when
       CursorResponseNotificationDto result = notificationService.getNotifications(receiverId,
@@ -200,10 +201,10 @@ class NotificationServiceTest {
       NotificationCursorRequest request = new NotificationCursorRequest(
           cursorStr, idAfter, 20);
 
-      given(notificationRepository.findNotificationByCursor(
+      given(notificationRepository.findUnreadNotificationByCursor(
           eq(receiverId), eq(Instant.parse(cursorStr)), eq(idAfter), eq(20)))
           .willReturn(List.of());
-      given(notificationRepository.countByReceiver_Id(receiverId)).willReturn(0L);
+      given(notificationRepository.countByReceiverIdAndReadAtIsNull(receiverId)).willReturn(0L);
 
       // when
       CursorResponseNotificationDto result = notificationService.getNotifications(receiverId,
@@ -214,7 +215,7 @@ class NotificationServiceTest {
       assertThat(result.hasNext()).isFalse();
       assertThat(result.totalCount()).isZero();
       then(notificationRepository).should()
-          .findNotificationByCursor(eq(receiverId), eq(Instant.parse(cursorStr)), eq(idAfter),
+          .findUnreadNotificationByCursor(eq(receiverId), eq(Instant.parse(cursorStr)), eq(idAfter),
               eq(20));
     }
 
@@ -231,7 +232,7 @@ class NotificationServiceTest {
           .satisfies(e -> assertThat(((NotificationException) e).getErrorCode())
               .isEqualTo(NotificationErrorCode.NOTIFICATION_INVALID_CURSOR));
       then(notificationRepository).should(never())
-          .findNotificationByCursor(any(), any(), any(), anyInt());
+          .findUnreadNotificationByCursor(any(), any(), any(), anyInt());
     }
 
     @Test
@@ -247,7 +248,7 @@ class NotificationServiceTest {
           .satisfies(e -> assertThat(((NotificationException) e).getErrorCode())
               .isEqualTo(NotificationErrorCode.NOTIFICATION_INVALID_CURSOR_PAIR));
       then(notificationRepository).should(never())
-          .findNotificationByCursor(any(), any(), any(), anyInt());
+          .findUnreadNotificationByCursor(any(), any(), any(), anyInt());
     }
 
     @Test
@@ -263,7 +264,7 @@ class NotificationServiceTest {
           .satisfies(e -> assertThat(((NotificationException) e).getErrorCode())
               .isEqualTo(NotificationErrorCode.NOTIFICATION_INVALID_CURSOR_PAIR));
       then(notificationRepository).should(never())
-          .findNotificationByCursor(any(), any(), any(), anyInt());
+          .findUnreadNotificationByCursor(any(), any(), any(), anyInt());
     }
 
     @Test
@@ -277,10 +278,10 @@ class NotificationServiceTest {
       Instant createdAt = Instant.parse("2025-08-01T09:00:00Z");
       Notification n1 = mockNotification(notifId, "단건 알림", "내용", NotificationLevel.INFO, createdAt);
 
-      given(notificationRepository.findNotificationByCursor(eq(receiverId), isNull(), isNull(),
-          eq(20)))
+      given(notificationRepository.findUnreadNotificationByCursor(eq(receiverId), isNull(),
+          isNull(), eq(20)))
           .willReturn(List.of(n1));
-      given(notificationRepository.countByReceiver_Id(receiverId)).willReturn(1L);
+      given(notificationRepository.countByReceiverIdAndReadAtIsNull(receiverId)).willReturn(1L);
 
       // when
       CursorResponseNotificationDto result = notificationService.getNotifications(receiverId,
@@ -296,25 +297,23 @@ class NotificationServiceTest {
   }
 
   @Nested
-  @DisplayName("deleteNotification (알림 삭제) 테스트")
-  class DeleteNotification {
+  @DisplayName("readNotification (알림 읽음 처리) 테스트")
+  class ReadNotification {
 
     @Test
-    @DisplayName("성공: 본인 알림을 삭제하면 Repository.delete가 호출된다.")
-    void success_delete_notification() {
+    @DisplayName("성공: 본인 알림을 읽음 처리하면 삭제하지 않고 readAt이 기록된다.")
+    void success_read_notification() {
       // given
       UUID notificationId = UUID.randomUUID();
-      Notification notification = mock(Notification.class);
-      User receiver = mock(User.class);
-      given(notification.getReceiver()).willReturn(receiver);
-      given(receiver.getId()).willReturn(receiverId);
+      Notification notification = createNotification(receiverId);
       given(notificationRepository.findById(notificationId)).willReturn(Optional.of(notification));
 
       // when
-      notificationService.deleteNotification(notificationId, receiverId);
+      notificationService.readNotification(notificationId, receiverId);
 
       // then
-      then(notificationRepository).should().delete(notification);
+      assertThat(notification.getReadAt()).isNotNull();
+      then(notificationRepository).should(never()).delete(any());
     }
 
     @Test
@@ -325,44 +324,44 @@ class NotificationServiceTest {
       given(notificationRepository.findById(notificationId)).willReturn(Optional.empty());
 
       // when & then
-      assertThatThrownBy(() -> notificationService.deleteNotification(notificationId, receiverId))
+      assertThatThrownBy(() -> notificationService.readNotification(notificationId, receiverId))
           .isInstanceOf(NotificationException.class)
           .satisfies(e -> assertThat(((NotificationException) e).getErrorCode())
               .isEqualTo(NotificationErrorCode.NOTIFICATION_NOT_FOUND));
     }
 
     @Test
-    @DisplayName("실패: 본인 알림이 아니면 NOTIFICATION_FORBIDDEN 예외가 발생한다.")
+    @DisplayName("실패: 본인 알림이 아니면 NOTIFICATION_FORBIDDEN 예외가 발생하고 읽음 처리되지 않는다.")
     void fail_throws_exception_when_not_owner() {
       // given
       UUID notificationId = UUID.randomUUID();
       UUID otherReceiverId = UUID.randomUUID();
-      Notification notification = mock(Notification.class);
-      User receiver = mock(User.class);
-      given(notification.getReceiver()).willReturn(receiver);
-      given(receiver.getId()).willReturn(receiverId); // 알림 소유자는 receiverId
+      Notification notification = createNotification(receiverId); // 알림 소유자는 receiverId
       given(notificationRepository.findById(notificationId)).willReturn(Optional.of(notification));
 
-      // when & then — 다른 유저 ID로 삭제 시도
+      // when & then: 다른 유저 ID로 읽음 처리 시도
       assertThatThrownBy(
-          () -> notificationService.deleteNotification(notificationId, otherReceiverId))
+          () -> notificationService.readNotification(notificationId, otherReceiverId))
           .isInstanceOf(NotificationException.class)
           .satisfies(e -> assertThat(((NotificationException) e).getErrorCode())
               .isEqualTo(NotificationErrorCode.NOTIFICATION_FORBIDDEN));
+      assertThat(notification.getReadAt()).isNull();
     }
+  }
+
+  private Notification createNotification(UUID receiverId) {
+    return Notification.create(receiverId, new NotificationTemplate("제목", "내용"),
+        NotificationType.FOLLOW_CREATED, "hashId");
   }
 
   private Notification mockNotification(UUID id, String title, String content,
       NotificationLevel level, Instant createdAt) {
     Notification notification = mock(Notification.class);
-    User receiver = mock(User.class);
     given(notification.getId()).willReturn(id);
-    given(notification.getTitle()).willReturn(title);
-    given(notification.getContent()).willReturn(content);
+    given(notification.getTemplate()).willReturn(new NotificationTemplate(title, content));
     given(notification.getLevel()).willReturn(level);
     given(notification.getCreatedAt()).willReturn(createdAt);
-    given(notification.getReceiver()).willReturn(receiver);
-    given(receiver.getId()).willReturn(receiverId);
+    given(notification.getReceiverId()).willReturn(receiverId);
     return notification;
   }
 }

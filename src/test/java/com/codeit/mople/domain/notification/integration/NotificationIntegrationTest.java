@@ -1,5 +1,6 @@
 package com.codeit.mople.domain.notification.integration;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -9,6 +10,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.codeit.mople.domain.auth.security.CustomUserDetails;
+import com.codeit.mople.domain.notification.entity.Notification;
+import com.codeit.mople.domain.notification.entity.NotificationTemplate;
+import com.codeit.mople.domain.notification.entity.NotificationType;
+import com.codeit.mople.domain.notification.repository.NotificationRepository;
 import com.codeit.mople.domain.user.entity.Role;
 import com.codeit.mople.global.config.SecurityConfig;
 import com.codeit.mople.global.jwt.JwtProvider;
@@ -47,6 +52,9 @@ public class NotificationIntegrationTest {
   @Autowired
   private ObjectMapper objectMapper;
 
+  @Autowired
+  private NotificationRepository notificationRepository;
+
   @MockitoBean
   private JwtProvider jwtProvider;
 
@@ -59,47 +67,25 @@ public class NotificationIntegrationTest {
   @BeforeEach
   void setUp() {
     alertCounter = 0;
-    // RECEIVER_ID를 가진 User를 native SQL로 삽입 (UUID auto-generate 우회)
-    entityManager.createNativeQuery(
-        "INSERT INTO users (id, email, password, name, role, provider, locked, created_at) " +
-            "VALUES (:id, 'temp@test.com', 'password', '임시유저', 'USER', 'LOCAL', false, CURRENT_TIMESTAMP)"
-    ).setParameter("id", RECEIVER_ID).executeUpdate();
-
     principal = new CustomUserDetails(RECEIVER_ID, Role.USER);
   }
 
-  // 알림마다 1초씩 다른 명시적 timestamp를 사용해 CURRENT_TIMESTAMP 정밀도 문제 방지
-  private void createNotification(String title, NotificationType type) {
-    alertCounter++;
-    Instant createdAt = Instant.EPOCH.plusSeconds(alertCounter);
-    entityManager.createNativeQuery(
-            "INSERT INTO notifications (id, receiver_id, title, content, level, notification_type, created_at) "
-                +
-                "VALUES (RANDOM_UUID(), :receiverId, :title, '내용', 'INFO', :type, :createdAt)"
-        )
-        .setParameter("receiverId", RECEIVER_ID)
-        .setParameter("title", title)
-        .setParameter("type", type.name())
-        .setParameter("createdAt", createdAt)
-        .executeUpdate();
+  private UUID createNotification(String title, NotificationType type) {
+    return createNotification(RECEIVER_ID, title, type);
   }
 
-  private UUID createNotificationAndReturnId(String title, NotificationType type) {
-    UUID id = UUID.randomUUID();
+  // 알림마다 1초씩 다른 명시적 timestamp로 덮어써 저장 시각의 정밀도 문제 방지
+  private UUID createNotification(UUID receiverId, String title, NotificationType type) {
     alertCounter++;
-    Instant createdAt = Instant.EPOCH.plusSeconds(alertCounter);
+    Notification saved = notificationRepository.saveAndFlush(Notification.create(receiverId,
+        new NotificationTemplate(title, "내용"), type, UUID.randomUUID().toString()));
     entityManager.createNativeQuery(
-            "INSERT INTO notifications (id, receiver_id, title, content, level, notification_type, created_at) "
-                +
-                "VALUES (:id, :receiverId, :title, '내용', 'INFO', :type, :createdAt)"
-        )
-        .setParameter("id", id)
-        .setParameter("receiverId", RECEIVER_ID)
-        .setParameter("title", title)
-        .setParameter("type", type.name())
-        .setParameter("createdAt", createdAt)
+            "UPDATE notifications SET created_at = :createdAt WHERE id = :id")
+        .setParameter("createdAt", Instant.EPOCH.plusSeconds(alertCounter))
+        .setParameter("id", saved.getId())
         .executeUpdate();
-    return id;
+    entityManager.clear();
+    return saved.getId();
   }
 
   @Nested
@@ -125,9 +111,9 @@ public class NotificationIntegrationTest {
     @Test
     @DisplayName("성공: 알림이 있으면 200과 최신순 알림 목록이 반환된다.")
     void success_returns_notifications_in_descending_order() throws Exception {
-      createNotification("오래된 알림", NotificationType.NEW_FOLLOWER);
-      createNotification("중간 알림", NotificationType.PLAYLIST_SUBSCRIBE);
-      createNotification("최신 알림", NotificationType.DIRECT_MESSAGE);
+      createNotification("오래된 알림", NotificationType.FOLLOW_CREATED);
+      createNotification("중간 알림", NotificationType.PLAYLIST_SUBSCRIBED);
+      createNotification("최신 알림", NotificationType.DIRECT_MESSAGE_RECEIVED);
 
       mockMvc.perform(get("/api/notifications")
               .param("limit", "20")
@@ -145,9 +131,9 @@ public class NotificationIntegrationTest {
     @Test
     @DisplayName("성공: 알림이 limit+1개 이상이면 hasNext=true이고 nextCursor가 반환된다.")
     void success_has_next_when_more_than_limit() throws Exception {
-      createNotification("알림1", NotificationType.NEW_FOLLOWER);
-      createNotification("알림2", NotificationType.NEW_FOLLOWER);
-      createNotification("알림3", NotificationType.NEW_FOLLOWER);
+      createNotification("알림1", NotificationType.FOLLOW_CREATED);
+      createNotification("알림2", NotificationType.FOLLOW_CREATED);
+      createNotification("알림3", NotificationType.FOLLOW_CREATED);
 
       mockMvc.perform(get("/api/notifications")
               .param("limit", "2")
@@ -164,25 +150,10 @@ public class NotificationIntegrationTest {
     @DisplayName("성공: 다른 receiver의 알림은 조회되지 않는다.")
     void success_notifications_are_isolated_by_receiver() throws Exception {
       UUID otherReceiverId = UUID.randomUUID();
-      entityManager.createNativeQuery(
-          "INSERT INTO users (id, email, password, name, role, provider, locked, created_at) " +
-              "VALUES (:id, 'other@test.com', 'password', '타유저', 'USER', 'LOCAL', false, CURRENT_TIMESTAMP)"
-      ).setParameter("id", otherReceiverId).executeUpdate();
 
-      createNotification("내 알림", NotificationType.NEW_FOLLOWER);
-
-      String otherSql =
-          "INSERT INTO notifications (id, receiver_id, title, content, level, notification_type, created_at) "
-              +
-              "VALUES (RANDOM_UUID(), :receiverId, :title, '내용', 'INFO', 'NEW_FOLLOWER', CURRENT_TIMESTAMP)";
-      entityManager.createNativeQuery(otherSql)
-          .setParameter("receiverId", otherReceiverId)
-          .setParameter("title", "타유저 알림1")
-          .executeUpdate();
-      entityManager.createNativeQuery(otherSql)
-          .setParameter("receiverId", otherReceiverId)
-          .setParameter("title", "타유저 알림2")
-          .executeUpdate();
+      createNotification("내 알림", NotificationType.FOLLOW_CREATED);
+      createNotification(otherReceiverId, "타유저 알림1", NotificationType.FOLLOW_CREATED);
+      createNotification(otherReceiverId, "타유저 알림2", NotificationType.FOLLOW_CREATED);
 
       mockMvc.perform(get("/api/notifications")
               .param("limit", "20")
@@ -197,7 +168,7 @@ public class NotificationIntegrationTest {
     @Test
     @DisplayName("성공: 각 알림의 응답 필드가 올바르게 반환된다.")
     void success_notification_fields_are_correct() throws Exception {
-      createNotification("팔로우 알림", NotificationType.NEW_FOLLOWER);
+      createNotification("팔로우 알림", NotificationType.FOLLOW_CREATED);
 
       mockMvc.perform(get("/api/notifications")
               .param("limit", "20")
@@ -216,7 +187,7 @@ public class NotificationIntegrationTest {
     @DisplayName("성공: limit을 생략하면 기본값 20이 적용된다.")
     void success_default_limit_when_omitted() throws Exception {
       for (int i = 1; i <= 25; i++) {
-        createNotification("알림" + i, NotificationType.NEW_FOLLOWER);
+        createNotification("알림" + i, NotificationType.FOLLOW_CREATED);
       }
 
       mockMvc.perform(get("/api/notifications")
@@ -229,14 +200,15 @@ public class NotificationIntegrationTest {
   }
 
   @Nested
-  @DisplayName("DELETE /api/notifications/{notificationId} - 알림 삭제")
-  class DeleteNotification {
+  @DisplayName("DELETE /api/notifications/{notificationId} - 알림 읽음 처리")
+  class ReadNotification {
 
     @Test
-    @DisplayName("성공: 본인 알림을 삭제하면 204가 반환되고 목록에서 사라진다.")
-    void success_delete_notification() throws Exception {
+    @DisplayName("성공: 본인 알림을 읽음 처리하면 204가 반환되고 목록과 totalCount에서 빠진다.")
+    void success_read_notification() throws Exception {
       // given
-      UUID notificationId = createNotificationAndReturnId("삭제할 알림", NotificationType.NEW_FOLLOWER);
+      UUID notificationId = createNotification("읽을 알림", NotificationType.FOLLOW_CREATED);
+      createNotification("안 읽은 알림", NotificationType.FOLLOW_CREATED);
 
       // when
       mockMvc.perform(delete("/api/notifications/{notificationId}", notificationId)
@@ -245,17 +217,37 @@ public class NotificationIntegrationTest {
           .andDo(print())
           .andExpect(status().isNoContent());
 
-      // then — 삭제 후 알림 목록 조회 시 해당 알림이 없음
+      // then: 읽음 처리 후 알림 목록에는 안 읽은 알림만 남음
       mockMvc.perform(get("/api/notifications")
               .param("limit", "20")
               .with(user(principal)))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.totalCount").value(0))
-          .andExpect(jsonPath("$.data").isEmpty());
+          .andExpect(jsonPath("$.totalCount").value(1))
+          .andExpect(jsonPath("$.data.length()").value(1))
+          .andExpect(jsonPath("$.data[0].title").value("안 읽은 알림"));
     }
 
     @Test
-    @DisplayName("실패: 존재하지 않는 알림을 삭제하면 404를 반환한다.")
+    @DisplayName("성공: 읽음 처리한 알림은 삭제되지 않고 readAt이 기록된다.")
+    void success_read_notification_keeps_notification_with_read_at() throws Exception {
+      // given
+      UUID notificationId = createNotification("읽을 알림", NotificationType.FOLLOW_CREATED);
+
+      // when
+      mockMvc.perform(delete("/api/notifications/{notificationId}", notificationId)
+              .with(user(principal))
+              .with(csrf()))
+          .andExpect(status().isNoContent());
+
+      // then
+      entityManager.flush();
+      entityManager.clear();
+      Notification notification = notificationRepository.findById(notificationId).orElseThrow();
+      assertThat(notification.getReadAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("실패: 존재하지 않는 알림을 읽음 처리하면 404를 반환한다.")
     void fail_404_when_notification_not_found() throws Exception {
       // given
       UUID nonExistentId = UUID.randomUUID();
@@ -271,28 +263,13 @@ public class NotificationIntegrationTest {
     }
 
     @Test
-    @DisplayName("실패: 다른 유저의 알림을 삭제하면 403을 반환한다.")
-    void fail_403_when_deleting_other_user_notification() throws Exception {
-      // given — 다른 유저 및 알림 삽입
-      UUID otherUserId = UUID.randomUUID();
-      entityManager.createNativeQuery(
-          "INSERT INTO users (id, email, password, name, role, provider, locked, created_at) " +
-              "VALUES (:id, 'other2@test.com', 'password', '타유저2', 'USER', 'LOCAL', false, CURRENT_TIMESTAMP)"
-      ).setParameter("id", otherUserId).executeUpdate();
+    @DisplayName("실패: 다른 유저의 알림을 읽음 처리하면 403을 반환한다.")
+    void fail_403_when_reading_other_user_notification() throws Exception {
+      // given
+      UUID otherNotificationId = createNotification(UUID.randomUUID(), "타유저 알림",
+          NotificationType.FOLLOW_CREATED);
 
-      UUID otherNotificationId = UUID.randomUUID();
-      alertCounter++;
-      entityManager.createNativeQuery(
-              "INSERT INTO notifications (id, receiver_id, title, content, level, notification_type, created_at) "
-                  +
-                  "VALUES (:id, :receiverId, '타유저 알림', '내용', 'INFO', 'NEW_FOLLOWER', :createdAt)"
-          )
-          .setParameter("id", otherNotificationId)
-          .setParameter("receiverId", otherUserId)
-          .setParameter("createdAt", Instant.EPOCH.plusSeconds(alertCounter))
-          .executeUpdate();
-
-      // when & then — RECEIVER_ID 유저가 타유저 알림 삭제 시도
+      // when & then: RECEIVER_ID 유저가 타유저 알림 읽음 처리 시도
       mockMvc.perform(delete("/api/notifications/{notificationId}", otherNotificationId)
               .with(user(principal))
               .with(csrf()))
@@ -310,9 +287,9 @@ public class NotificationIntegrationTest {
     @Test
     @DisplayName("성공: 첫 페이지의 nextCursor로 다음 페이지를 조회하면 이전에 없던 알림이 반환된다.")
     void success_next_page_with_cursor() throws Exception {
-      createNotification("알림1", NotificationType.NEW_FOLLOWER);
-      createNotification("알림2", NotificationType.PLAYLIST_SUBSCRIBE);
-      createNotification("알림3", NotificationType.DIRECT_MESSAGE);
+      createNotification("알림1", NotificationType.FOLLOW_CREATED);
+      createNotification("알림2", NotificationType.PLAYLIST_SUBSCRIBED);
+      createNotification("알림3", NotificationType.DIRECT_MESSAGE_RECEIVED);
 
       // 첫 페이지 (limit=2) → 알림3, 알림2 반환
       MvcResult firstResult = mockMvc.perform(get("/api/notifications")
@@ -347,9 +324,9 @@ public class NotificationIntegrationTest {
     @Test
     @DisplayName("성공: 3페이지에 걸친 연속 cursor 페이지네이션이 올바르게 동작한다.")
     void success_three_page_cursor_pagination() throws Exception {
-      createNotification("알림1", NotificationType.NEW_FOLLOWER);
-      createNotification("알림2", NotificationType.PLAYLIST_SUBSCRIBE);
-      createNotification("알림3", NotificationType.DIRECT_MESSAGE);
+      createNotification("알림1", NotificationType.FOLLOW_CREATED);
+      createNotification("알림2", NotificationType.PLAYLIST_SUBSCRIBED);
+      createNotification("알림3", NotificationType.DIRECT_MESSAGE_RECEIVED);
 
       // 1페이지: limit=1 → 알림3 반환, hasNext=true
       MvcResult page1 = mockMvc.perform(get("/api/notifications")

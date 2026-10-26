@@ -287,15 +287,15 @@ class NotificationControllerTest {
   }
 
   @Nested
-  @DisplayName("DELETE /api/notifications/{notificationId} - 알림 삭제")
-  class DeleteNotification {
+  @DisplayName("DELETE /api/notifications/{notificationId} - 알림 읽음 처리")
+  class ReadNotification {
 
     @Test
-    @DisplayName("성공: 본인 알림을 삭제하면 204를 반환한다.")
-    void success_204_when_delete_notification() throws Exception {
+    @DisplayName("성공: 본인 알림을 읽음 처리하면 204를 반환한다.")
+    void success_204_when_read_notification() throws Exception {
       // given
       UUID notificationId = UUID.randomUUID();
-      willDoNothing().given(notificationService).deleteNotification(any(), any());
+      willDoNothing().given(notificationService).readNotification(any(), any());
 
       // when & then
       mockMvc.perform(delete("/api/notifications/{notificationId}", notificationId)
@@ -305,7 +305,7 @@ class NotificationControllerTest {
           .andExpect(status().isNoContent());
 
       then(notificationService).should()
-          .deleteNotification(eq(notificationId), eq(principal.getUserId()));
+          .readNotification(eq(notificationId), eq(principal.getUserId()));
     }
 
     @Test
@@ -326,7 +326,7 @@ class NotificationControllerTest {
       // given
       UUID notificationId = UUID.randomUUID();
       willThrow(new NotificationException(NotificationErrorCode.NOTIFICATION_NOT_FOUND))
-          .given(notificationService).deleteNotification(any(), any());
+          .given(notificationService).readNotification(any(), any());
 
       // when & then
       mockMvc.perform(delete("/api/notifications/{notificationId}", notificationId)
@@ -344,7 +344,7 @@ class NotificationControllerTest {
       // given
       UUID notificationId = UUID.randomUUID();
       willThrow(new NotificationException(NotificationErrorCode.NOTIFICATION_FORBIDDEN))
-          .given(notificationService).deleteNotification(any(), any());
+          .given(notificationService).readNotification(any(), any());
 
       // when & then
       mockMvc.perform(delete("/api/notifications/{notificationId}", notificationId)

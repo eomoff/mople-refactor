@@ -16,12 +16,13 @@ public class NotificationRepositoryImpl implements NotificationRepositoryCustom 
   private final JPAQueryFactory queryFactory;
 
   @Override
-  public List<Notification> findNotificationByCursor(UUID receiverId, Instant cursorTime,
+  public List<Notification> findUnreadNotificationByCursor(UUID receiverId, Instant cursorTime,
       UUID idAfter, int limit) {
     return queryFactory
         .selectFrom(notification)
         .where(
-            notification.receiver.id.eq(receiverId),
+            notification.receiverId.eq(receiverId),
+            notification.readAt.isNull(),
             cursorCondition(cursorTime, idAfter)
         )
         .limit(limit + 1)

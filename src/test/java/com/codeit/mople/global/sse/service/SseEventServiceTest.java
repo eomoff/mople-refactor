@@ -14,6 +14,7 @@ import com.codeit.mople.domain.directmessage.exception.DirectMessageException;
 import com.codeit.mople.domain.directmessage.repository.DirectMessageRepository;
 import com.codeit.mople.domain.notification.dto.response.NotificationResponse;
 import com.codeit.mople.domain.notification.entity.Notification;
+import com.codeit.mople.domain.notification.entity.NotificationTemplate;
 import com.codeit.mople.domain.notification.exception.NotificationErrorCode;
 import com.codeit.mople.domain.notification.exception.NotificationException;
 import com.codeit.mople.domain.notification.repository.NotificationRepository;
@@ -144,24 +145,21 @@ public class SseEventServiceTest {
     @DisplayName("알림 DTO 조회 성공")
     void getNotificationResponse_success() {
       // given
-
-      // BeforeEach에서 notificaitonId, notification, receiver를 초기화
-
       given(notificationRepository.findById(notificationId))
           .willReturn(Optional.of(notification));
 
-      given(notification.getReceiver())
-          .willReturn(receiver);
+      given(notification.getTemplate())
+          .willReturn(new NotificationTemplate("제목", "내용"));
 
       // when
       NotificationResponse result =
           sseEventService.getNotificationResponse(notificationId);
 
       // then
-      assertThat(result).isNotNull();
+      assertThat(result.title()).isEqualTo("제목");
+      assertThat(result.content()).isEqualTo("내용");
 
       verify(notificationRepository).findById(notificationId);
-      verify(notification).getReceiver();
     }
 
     @Test

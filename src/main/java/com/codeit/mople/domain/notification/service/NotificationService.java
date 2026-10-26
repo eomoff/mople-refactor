@@ -31,7 +31,7 @@ public class NotificationService {
 
     request.validateCursorPair();
     Instant cursorTime = request.parseCursorToInstant();
-    List<Notification> notifications = notificationRepository.findNotificationByCursor(
+    List<Notification> notifications = notificationRepository.findUnreadNotificationByCursor(
         receiverId, cursorTime, request.idAfter(), request.limit());
 
     boolean hasNext = notifications.size() > request.limit();
@@ -50,7 +50,7 @@ public class NotificationService {
       nextIdAfter = lastItem.getId();
     }
 
-    long unreadCount = notificationRepository.countByReceiver_Id(receiverId);
+    long unreadCount = notificationRepository.countByReceiverIdAndReadAtIsNull(receiverId);
     log.info("알림 목록 조회 완료 - receiverId: {}", receiverId);
 
     return new CursorResponseNotificationDto(
