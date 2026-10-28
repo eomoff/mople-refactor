@@ -28,7 +28,6 @@ import com.codeit.mople.domain.playlist.event.PlaylistCreatedEvent;
 import com.codeit.mople.domain.playlist.event.PlaylistSearchIndexDeleteEvent;
 import com.codeit.mople.domain.playlist.event.PlaylistSearchIndexEvent;
 import com.codeit.mople.domain.playlist.event.PlaylistSubscribedEvent;
-import com.codeit.mople.domain.playlist.event.PlaylistUnsubscribedEvent;
 import com.codeit.mople.domain.playlist.exception.PlaylistErrorCode;
 import com.codeit.mople.domain.playlist.exception.PlaylistException;
 import com.codeit.mople.domain.playlist.repository.PlaylistContentRepository;
@@ -88,9 +87,6 @@ public class PlaylistServiceTest {
 
   @Captor
   private ArgumentCaptor<PlaylistSubscribedEvent> subscribedEventCaptor;
-
-  @Captor
-  private ArgumentCaptor<PlaylistUnsubscribedEvent> unsubscribedEventCaptor;
 
   @Captor
   private ArgumentCaptor<PlaylistContentAddedEvent> contentAddedEventCaptor;
@@ -912,6 +908,7 @@ public class PlaylistServiceTest {
 
       // then
       verify(playlistSubscriptionRepository).save(any(PlaylistSubscription.class));
+      verify(playlistRepository).increaseSubscriberCount(playlistId);
       verify(eventPublisher).publishEvent(subscribedEventCaptor.capture());
 
       PlaylistSubscribedEvent event = subscribedEventCaptor.getValue();
@@ -940,6 +937,7 @@ public class PlaylistServiceTest {
           .hasFieldOrPropertyWithValue("errorCode", PlaylistErrorCode.SUBSCRIBE_DUPLICATE);
 
       verify(playlistSubscriptionRepository, never()).save(any());
+      verify(playlistRepository, never()).increaseSubscriberCount(any());
       verify(eventPublisher, never()).publishEvent(any());
     }
 
@@ -956,6 +954,7 @@ public class PlaylistServiceTest {
           .hasFieldOrPropertyWithValue("errorCode", PlaylistErrorCode.SUBSCRIBE_NOT_FOUND);
 
       verify(playlistSubscriptionRepository, never()).save(any());
+      verify(playlistRepository, never()).increaseSubscriberCount(any());
       verify(eventPublisher, never()).publishEvent(any());
     }
 
@@ -974,6 +973,7 @@ public class PlaylistServiceTest {
           .hasFieldOrPropertyWithValue("errorCode", PlaylistErrorCode.SUBSCRIBE_USER_NOT_FOUND);
 
       verify(playlistSubscriptionRepository, never()).save(any());
+      verify(playlistRepository, never()).increaseSubscriberCount(any());
       verify(eventPublisher, never()).publishEvent(any());
     }
 
@@ -992,6 +992,7 @@ public class PlaylistServiceTest {
 
       verify(userRepository, never()).findById(any());
       verify(playlistSubscriptionRepository, never()).save(any());
+      verify(playlistRepository, never()).increaseSubscriberCount(any());
       verify(eventPublisher, never()).publishEvent(any());
     }
 
@@ -1009,6 +1010,7 @@ public class PlaylistServiceTest {
 
       given(playlistSubscriptionRepository.deleteByPlaylistIdAndSubscriberId(playlistId,
           subscriberId)).willReturn(1);
+      given(playlistRepository.decreaseSubscriberCount(playlistId)).willReturn(1);
 
       // when
       playlistService.unSubscribe(playlistId, subscriberId);
@@ -1016,12 +1018,25 @@ public class PlaylistServiceTest {
       // then
       verify(playlistSubscriptionRepository).deleteByPlaylistIdAndSubscriberId(playlistId,
           subscriberId);
-      verify(eventPublisher).publishEvent(unsubscribedEventCaptor.capture());
+      verify(playlistRepository).decreaseSubscriberCount(playlistId);
+      verifyNoInteractions(eventPublisher);
+    }
 
-      PlaylistUnsubscribedEvent event = unsubscribedEventCaptor.getValue();
+    @Test
+    @DisplayName("구독자 수가 이미 0이어도 구독 취소는 성공")
+    void unSubscribe_subscriberCountAlreadyZero() {
+      UUID playlistId = UUID.randomUUID();
+      UUID subscriberId = UUID.randomUUID();
 
-      assertThat(event.playlistId()).isEqualTo(playlistId);
-      assertThat(event.subscriberId()).isEqualTo(subscriberId);
+      given(playlistSubscriptionRepository.deleteByPlaylistIdAndSubscriberId(playlistId,
+          subscriberId)).willReturn(1);
+      given(playlistRepository.decreaseSubscriberCount(playlistId)).willReturn(0);
+
+      // when
+      playlistService.unSubscribe(playlistId, subscriberId);
+
+      // then
+      verify(playlistRepository).decreaseSubscriberCount(playlistId);
     }
 
     @Test

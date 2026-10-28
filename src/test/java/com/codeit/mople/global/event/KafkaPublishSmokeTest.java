@@ -12,8 +12,6 @@ import com.codeit.mople.domain.notification.event.NotificationCreatedEvent;
 import com.codeit.mople.domain.playlist.event.PlaylistContentAddedEvent;
 import com.codeit.mople.domain.playlist.event.PlaylistSearchIndexDeleteEvent;
 import com.codeit.mople.domain.playlist.event.PlaylistSearchIndexEvent;
-import com.codeit.mople.domain.playlist.event.PlaylistSubscribedEvent;
-import com.codeit.mople.domain.playlist.event.PlaylistUnsubscribedEvent;
 import com.codeit.mople.domain.review.event.ReviewCreatedEvent;
 import com.codeit.mople.domain.review.event.ReviewDeletedEvent;
 import com.codeit.mople.domain.review.event.ReviewUpdatedEvent;
@@ -55,7 +53,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 @EmbeddedKafka(partitions = 1, topics = {
     KafkaPublishSmokeTest.FOLLOW_TOPIC,
     KafkaPublishSmokeTest.PLAYLIST_CONTENT_TOPIC,
-    KafkaPublishSmokeTest.PLAYLIST_EVENTS_TOPIC,
     KafkaPublishSmokeTest.PLAYLIST_SEARCH_INDEX_TOPIC,
     KafkaPublishSmokeTest.CONTENT_SEARCH_INDEX_TOPIC,
     KafkaPublishSmokeTest.USER_SEARCH_INDEX_TOPIC,
@@ -70,7 +67,6 @@ class KafkaPublishSmokeTest {
 
   static final String FOLLOW_TOPIC = "mople.follow.created.v1";
   static final String PLAYLIST_CONTENT_TOPIC = "mople.playlist.content-added.v1";
-  static final String PLAYLIST_EVENTS_TOPIC = "mople.playlist-events.v1";
   static final String PLAYLIST_SEARCH_INDEX_TOPIC = "mople.playlist-search-index-events.v1";
   static final String CONTENT_SEARCH_INDEX_TOPIC = "mople.content-search-index-events.v1";
   static final String USER_SEARCH_INDEX_TOPIC = "mople.user-search-index-events.v1";
@@ -232,11 +228,6 @@ class KafkaPublishSmokeTest {
       UUID id = UUID.randomUUID();
 
       return Stream.of(
-          arguments(new PlaylistSubscribedEvent(UUID.randomUUID(), Instant.now(), id, id, id, "구독자",
-                  "플리"),
-              PLAYLIST_EVENTS_TOPIC, "playlist-subscribed.v1"),
-          arguments(new PlaylistUnsubscribedEvent(UUID.randomUUID(), Instant.now(), id, id),
-              PLAYLIST_EVENTS_TOPIC, "playlist-unsubscribed.v1"),
           arguments(new PlaylistSearchIndexEvent(UUID.randomUUID(), Instant.now(), id, "플리",
                   Instant.now(), 3L),
               PLAYLIST_SEARCH_INDEX_TOPIC, "playlist-search-index.v1"),

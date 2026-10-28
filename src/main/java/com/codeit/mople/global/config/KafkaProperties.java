@@ -18,7 +18,6 @@ public record KafkaProperties(
 
   public record Topics(
       @NotBlank String followCreated,
-      @NotBlank String playlistEvents,
       @NotBlank String playlistContentAdded,
       @NotBlank String reviewCreated,
       @NotBlank String reviewUpdated,

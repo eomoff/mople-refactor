@@ -16,7 +16,6 @@ import com.codeit.mople.domain.playlist.event.PlaylistCreatedEvent;
 import com.codeit.mople.domain.playlist.event.PlaylistSearchIndexDeleteEvent;
 import com.codeit.mople.domain.playlist.event.PlaylistSearchIndexEvent;
 import com.codeit.mople.domain.playlist.event.PlaylistSubscribedEvent;
-import com.codeit.mople.domain.playlist.event.PlaylistUnsubscribedEvent;
 import com.codeit.mople.domain.playlist.exception.PlaylistErrorCode;
 import com.codeit.mople.domain.playlist.exception.PlaylistException;
 import com.codeit.mople.domain.playlist.repository.PlaylistContentRepository;
@@ -447,12 +446,13 @@ public class PlaylistService {
     PlaylistSubscription saved = playlistSubscriptionRepository.save(
         PlaylistSubscription.create(playlist, subscriber));
 
+    // 구독자 수 실제 count
+    playlistRepository.increaseSubscriberCount(playlistId);
+
     log.info("플레이리스트 구독 성공: playlistSubscriptionId={}, playlistId={}, subscriberId={}",
         saved.getId(), playlistId, subscriberId);
 
     publisher.publishEvent(new PlaylistSubscribedEvent(
-        UUID.randomUUID(),
-        saved.getCreatedAt(),
         ownerId,
         playlistId,
         subscriberId,
@@ -460,7 +460,7 @@ public class PlaylistService {
         playlist.getTitle()
     ));
 
-    //구독 성공 후 카운트
+    // 구독 성공 후 카운트 메트릭
     playlistSubscribeCounter.increment();
   }
 
@@ -478,12 +478,12 @@ public class PlaylistService {
           Map.of("playlistId", playlistId, "subscriberId", subscriberId));
     }
 
-    publisher.publishEvent(new PlaylistUnsubscribedEvent(
-        UUID.randomUUID(),
-        Instant.now(),
-        playlistId,
-        subscriberId
-    ));
+    // 구독자 수는 이벤트로 넘기면 유실될 수 있어 구독 삭제와 같은 트랜잭션에서 내린다
+    int decreased = playlistRepository.decreaseSubscriberCount(playlistId);
+    if (decreased == 0) {
+      log.warn("구독자 수 감소 실패(이미 0): playlistId={}, subscriberId={}",
+          playlistId, subscriberId);
+    }
 
     log.info("플레이리스트 구독 취소 성공: playlist={}, subscriberId={}",
         playlistId, subscriberId);

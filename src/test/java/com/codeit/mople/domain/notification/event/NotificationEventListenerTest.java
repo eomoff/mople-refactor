@@ -19,7 +19,6 @@ import com.codeit.mople.domain.review.event.ReviewWrittenEvent;
 import com.codeit.mople.domain.user.admin.enums.ForceLogoutReason;
 import com.codeit.mople.domain.user.admin.event.UserAccountStatusChangedEvent;
 import java.util.List;
-import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -117,12 +116,11 @@ class NotificationEventListenerTest {
   @DisplayName("플레이리스트 구독 이벤트 발생 시 owner에게 PLAYLIST_SUBSCRIBED 알림을 생성한다")
   void handle_playlist_subscribed() {
     // given
-    UUID eventId = UUID.randomUUID();
     UUID ownerId = UUID.randomUUID();
     UUID playlistId = UUID.randomUUID();
     UUID subscriberId = UUID.randomUUID();
 
-    PlaylistSubscribedEvent event = new PlaylistSubscribedEvent(eventId, Instant.now(),
+    PlaylistSubscribedEvent event = new PlaylistSubscribedEvent(
         ownerId,
         playlistId,
         subscriberId,

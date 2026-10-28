@@ -37,7 +37,6 @@ spring:
 
     topics:
       follow-created: mople.follow.created.v1
-      playlist-events: mople.playlist-events.v1
       playlist-content-added: mople.playlist.content-added.v1
       review-created: mople.review.created.v1
       review-updated: mople.review.updated.v1
@@ -141,8 +140,6 @@ mople:
     type-mapping: >-
       follow-created.v1:com.codeit.mople.domain.follow.event.FollowCreatedEvent,
       playlist-content-added.v1:com.codeit.mople.domain.playlist.event.PlaylistContentAddedEvent,
-      playlist-subscribed.v1:com.codeit.mople.domain.playlist.event.PlaylistSubscribedEvent,
-      playlist-unsubscribed.v1:com.codeit.mople.domain.playlist.event.PlaylistUnsubscribedEvent,
       playlist-search-index.v1:com.codeit.mople.domain.playlist.event.PlaylistSearchIndexEvent,
       playlist-search-index-delete.v1:com.codeit.mople.domain.playlist.event.PlaylistSearchIndexDeleteEvent,
       content-search-index.v1:com.codeit.mople.domain.content.event.ContentSearchIndexEvent,

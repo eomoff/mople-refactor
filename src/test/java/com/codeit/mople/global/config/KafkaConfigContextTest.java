@@ -23,7 +23,6 @@ class KafkaConfigContextTest {
   static KafkaProperties kafkaProperties() {
     return new KafkaProperties(true, BOOTSTRAP_SERVERS, new KafkaProperties.Topics(
         "mople.follow.created.v1",
-        "mople.playlist-events.v1",
         "mople.playlist.content-added.v1",
         "mople.review.created.v1",
         "mople.review.updated.v1",
