@@ -26,7 +26,12 @@ public record KafkaProperties(
       @NotBlank String notificationCreated,
       @NotBlank String contentSearchIndex,
       @NotBlank String userSearchIndex,
-      @NotBlank String playlistSearchIndex
+      @NotBlank String playlistSearchIndex,
+      @NotBlank String userAccountStatusChanged,
+      @NotBlank String playlistSubscribed,
+      @NotBlank String playlistCreated,
+      @NotBlank String directMessageReceived,
+      @NotBlank String reviewWritten
   ) {
 
   }

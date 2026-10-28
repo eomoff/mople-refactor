@@ -54,7 +54,12 @@ class FollowEventProducerTest {
             "mople.notification.created.v1",
             "mople.content-search-index-events.v1",
             "mople.user-search-index-events.v1",
-            "mople.playlist-search-index-events.v1"
+            "mople.playlist-search-index-events.v1",
+            "mople.user.account-status-changed.v1",
+            "mople.playlist.subscribed.v1",
+            "mople.playlist.created.v1",
+            "mople.direct-message.received.v1",
+            "mople.review.written.v1"
         )
     );
 

@@ -178,7 +178,15 @@ public class ReviewServiceTest {
       verify(contentRepository).findById(contentId);
       verify(reviewRepository).save(any(Review.class));
 
-      verify(eventPublisher).publishEvent(new ReviewWrittenEvent(reviewId, authorId, "test"));
+      verify(eventPublisher).publishEvent(
+          argThat((Object event) ->
+              event instanceof ReviewWrittenEvent writtenEvent
+                  && writtenEvent.eventId() != null
+                  && writtenEvent.reviewId().equals(reviewId)
+                  && writtenEvent.authorId().equals(authorId)
+                  && writtenEvent.authorName().equals("test")
+          )
+      );
 
       verify(eventPublisher).publishEvent(
           argThat((Object event) ->

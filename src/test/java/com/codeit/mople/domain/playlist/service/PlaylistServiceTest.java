@@ -182,10 +182,21 @@ public class PlaylistServiceTest {
       // 행위 중심(given(...) 메서드가 호출됐는지 검증)
       verify(userRepository).findById(ownerId);
       verify(playlistRepository).save(any(Playlist.class));
-      verify(eventPublisher).publishEvent(
-          new PlaylistCreatedEvent(playlist.getId(), ownerId, "test", title));
 
       // publishEvent 동시에 검증 시 ClassCastException 발생하여 assert로 값 검증
+      ArgumentCaptor<PlaylistCreatedEvent> createdCaptor =
+          ArgumentCaptor.forClass(PlaylistCreatedEvent.class);
+
+      verify(eventPublisher).publishEvent(createdCaptor.capture());
+
+      PlaylistCreatedEvent createdEvent = createdCaptor.getValue();
+
+      assertThat(createdEvent.eventId()).isNotNull();
+      assertThat(createdEvent.playlistId()).isEqualTo(playlist.getId());
+      assertThat(createdEvent.ownerId()).isEqualTo(ownerId);
+      assertThat(createdEvent.ownerName()).isEqualTo("test");
+      assertThat(createdEvent.playlistTitle()).isEqualTo(title);
+
       ArgumentCaptor<PlaylistSearchIndexEvent> captor =
           ArgumentCaptor.forClass(PlaylistSearchIndexEvent.class);
 

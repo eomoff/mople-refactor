@@ -16,6 +16,7 @@ public class ReviewEventProducer {
   private final String reviewCreatedTopic;
   private final String reviewUpdatedTopic;
   private final String reviewDeletedTopic;
+  private final String reviewWrittenTopic;
 
   public ReviewEventProducer(
       KafkaTemplate<String, Object> kafkaTemplate,
@@ -25,6 +26,7 @@ public class ReviewEventProducer {
     this.reviewCreatedTopic = properties.topics().reviewCreated();
     this.reviewUpdatedTopic = properties.topics().reviewUpdated();
     this.reviewDeletedTopic = properties.topics().reviewDeleted();
+    this.reviewWrittenTopic = properties.topics().reviewWritten();
   }
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -40,6 +42,11 @@ public class ReviewEventProducer {
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void on(ReviewDeletedEvent event) {
     kafkaTemplate.send(reviewDeletedTopic, event.eventId().toString(), event);
+  }
+
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  public void on(ReviewWrittenEvent event) {
+    kafkaTemplate.send(reviewWrittenTopic, event.eventId().toString(), event);
   }
 
 }

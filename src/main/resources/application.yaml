@@ -46,6 +46,11 @@ spring:
       content-search-index: mople.content-search-index-events.v1
       user-search-index: mople.user-search-index-events.v1
       playlist-search-index: mople.playlist-search-index-events.v1
+      user-account-status-changed: mople.user.account-status-changed.v1
+      playlist-subscribed: mople.playlist.subscribed.v1
+      playlist-created: mople.playlist.created.v1
+      direct-message-received: mople.direct-message.received.v1
+      review-written: mople.review.written.v1
 
     producer:
       acks: all

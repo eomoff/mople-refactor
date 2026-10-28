@@ -1,6 +1,10 @@
 package com.codeit.mople.domain.review.event;
 
 import com.codeit.mople.domain.content.repository.ContentRepository;
+import com.codeit.mople.domain.follow.service.FollowService;
+import com.codeit.mople.domain.notification.entity.NotificationTemplate;
+import com.codeit.mople.domain.notification.entity.NotificationType;
+import com.codeit.mople.domain.notification.service.NotificationCreator;
 import com.codeit.mople.global.config.KafkaProperties;
 import com.codeit.mople.global.event.processed.ProcessedEventRepository;
 import java.util.UUID;
@@ -20,6 +24,10 @@ public class ReviewEventConsumer {
   private final ContentRepository contentRepository;
 
   private final ProcessedEventRepository processedEventRepository;
+
+  private final NotificationCreator notificationCreator;
+
+  private final FollowService followService;
 
 
   // 기본 전파레벨은 REQUIRED(트랜잭션 내에서 이 메서드가 호출되면 트랜잭션 새로 생성하지 않고 그 트랜잭션에 참여)
@@ -79,6 +87,31 @@ public class ReviewEventConsumer {
 
     log.info("리뷰 삭제 후 콘텐츠 통계 업데이트 완료: contentId={}, rating={}",
         event.contentId(), event.rating());
+  }
+
+  @Transactional
+  @KafkaListener(topics = "${spring.kafka.topics.review-written}")
+  public void handle(ReviewWrittenEvent event) {
+    log.debug("리뷰 작성 팔로워 알림 시도: reviewId={}, authorId={}",
+        event.reviewId(), event.authorId());
+
+    if (checkAndRecordProcessedEvent(event.eventId())) {
+      return;
+    }
+
+    followService.getFollowerIds(event.authorId())
+        .forEach(followerId -> notificationCreator.createNotification(
+            followerId,
+            new NotificationTemplate(
+                event.authorName() + "님의 새로운 활동이 있습니다.",
+                "리뷰를 작성했습니다."
+            ),
+            NotificationType.FOLLOWEE_ACTIVITY,
+            event.reviewId().toString()
+        ));
+
+    log.info("리뷰 작성 팔로워 알림 완료: reviewId={}, authorId={}",
+        event.reviewId(), event.authorId());
   }
 
 

@@ -7,14 +7,20 @@ import com.codeit.mople.domain.content.entity.ContentType;
 import com.codeit.mople.domain.content.event.ContentSearchIndexDeleteEvent;
 import com.codeit.mople.domain.content.event.ContentSearchIndexEvent;
 import com.codeit.mople.domain.directmessage.event.DirectMessageCreatedEvent;
+import com.codeit.mople.domain.directmessage.event.DirectMessageReceivedEvent;
 import com.codeit.mople.domain.follow.event.FollowCreatedEvent;
 import com.codeit.mople.domain.notification.event.NotificationCreatedEvent;
 import com.codeit.mople.domain.playlist.event.PlaylistContentAddedEvent;
+import com.codeit.mople.domain.playlist.event.PlaylistCreatedEvent;
 import com.codeit.mople.domain.playlist.event.PlaylistSearchIndexDeleteEvent;
 import com.codeit.mople.domain.playlist.event.PlaylistSearchIndexEvent;
+import com.codeit.mople.domain.playlist.event.PlaylistSubscribedEvent;
 import com.codeit.mople.domain.review.event.ReviewCreatedEvent;
 import com.codeit.mople.domain.review.event.ReviewDeletedEvent;
 import com.codeit.mople.domain.review.event.ReviewUpdatedEvent;
+import com.codeit.mople.domain.review.event.ReviewWrittenEvent;
+import com.codeit.mople.domain.user.admin.enums.ForceLogoutReason;
+import com.codeit.mople.domain.user.admin.event.UserAccountStatusChangedEvent;
 import com.codeit.mople.domain.user.event.UserSearchIndexEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
@@ -60,7 +66,12 @@ import org.springframework.transaction.support.TransactionTemplate;
     KafkaPublishSmokeTest.NOTIFICATION_TOPIC,
     KafkaPublishSmokeTest.REVIEW_CREATED_TOPIC,
     KafkaPublishSmokeTest.REVIEW_UPDATED_TOPIC,
-    KafkaPublishSmokeTest.REVIEW_DELETED_TOPIC
+    KafkaPublishSmokeTest.REVIEW_DELETED_TOPIC,
+    KafkaPublishSmokeTest.USER_ACCOUNT_STATUS_CHANGED_TOPIC,
+    KafkaPublishSmokeTest.PLAYLIST_SUBSCRIBED_TOPIC,
+    KafkaPublishSmokeTest.PLAYLIST_CREATED_TOPIC,
+    KafkaPublishSmokeTest.DIRECT_MESSAGE_RECEIVED_TOPIC,
+    KafkaPublishSmokeTest.REVIEW_WRITTEN_TOPIC
 })
 @DisplayName("Kafka 발행 스모크 테스트")
 class KafkaPublishSmokeTest {
@@ -75,6 +86,11 @@ class KafkaPublishSmokeTest {
   static final String REVIEW_CREATED_TOPIC = "mople.review.created.v1";
   static final String REVIEW_UPDATED_TOPIC = "mople.review.updated.v1";
   static final String REVIEW_DELETED_TOPIC = "mople.review.deleted.v1";
+  static final String USER_ACCOUNT_STATUS_CHANGED_TOPIC = "mople.user.account-status-changed.v1";
+  static final String PLAYLIST_SUBSCRIBED_TOPIC = "mople.playlist.subscribed.v1";
+  static final String PLAYLIST_CREATED_TOPIC = "mople.playlist.created.v1";
+  static final String DIRECT_MESSAGE_RECEIVED_TOPIC = "mople.direct-message.received.v1";
+  static final String REVIEW_WRITTEN_TOPIC = "mople.review.written.v1";
 
   static final String TYPE_ID_HEADER = "__TypeId__";
 
@@ -251,7 +267,21 @@ class KafkaPublishSmokeTest {
           arguments(new DirectMessageCreatedEvent(UUID.randomUUID(), Instant.now(), id, id),
               DIRECT_MESSAGE_TOPIC, DirectMessageCreatedEvent.class.getName()),
           arguments(new NotificationCreatedEvent(UUID.randomUUID(), Instant.now(), id, id),
-              NOTIFICATION_TOPIC, NotificationCreatedEvent.class.getName())
+              NOTIFICATION_TOPIC, NotificationCreatedEvent.class.getName()),
+          arguments(new UserAccountStatusChangedEvent(UUID.randomUUID(), Instant.now(), id,
+                  ForceLogoutReason.ROLE_CHANGE, true),
+              USER_ACCOUNT_STATUS_CHANGED_TOPIC, UserAccountStatusChangedEvent.class.getName()),
+          arguments(new PlaylistSubscribedEvent(UUID.randomUUID(), Instant.now(), id, id, id,
+                  "구독자", "플리"),
+              PLAYLIST_SUBSCRIBED_TOPIC, PlaylistSubscribedEvent.class.getName()),
+          arguments(new PlaylistCreatedEvent(UUID.randomUUID(), Instant.now(), id, id, "주인",
+                  "플리"),
+              PLAYLIST_CREATED_TOPIC, PlaylistCreatedEvent.class.getName()),
+          arguments(new DirectMessageReceivedEvent(UUID.randomUUID(), Instant.now(), id, id,
+                  "발신자", "안녕하세요"),
+              DIRECT_MESSAGE_RECEIVED_TOPIC, DirectMessageReceivedEvent.class.getName()),
+          arguments(new ReviewWrittenEvent(UUID.randomUUID(), Instant.now(), id, id, "작성자"),
+              REVIEW_WRITTEN_TOPIC, ReviewWrittenEvent.class.getName())
       );
     }
 

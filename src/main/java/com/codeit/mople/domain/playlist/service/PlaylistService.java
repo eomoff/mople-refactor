@@ -109,8 +109,8 @@ public class PlaylistService {
         savedPlaylist.getId(), owner.getId());
 
     publisher.publishEvent(
-        new PlaylistCreatedEvent(savedPlaylist.getId(), ownerId, owner.getName(),
-            savedPlaylist.getTitle())
+        new PlaylistCreatedEvent(UUID.randomUUID(), savedPlaylist.getCreatedAt(),
+            savedPlaylist.getId(), ownerId, owner.getName(), savedPlaylist.getTitle())
     );
 
     publisher.publishEvent(
@@ -453,6 +453,8 @@ public class PlaylistService {
         saved.getId(), playlistId, subscriberId);
 
     publisher.publishEvent(new PlaylistSubscribedEvent(
+        UUID.randomUUID(),
+        saved.getCreatedAt(),
         ownerId,
         playlistId,
         subscriberId,

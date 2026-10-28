@@ -52,7 +52,8 @@ public class AdminService {
       sessionTokenRepository.invalidate(userId);
       refreshTokenRepository.invalidate(userId);
       eventPublisher.publishEvent(
-          new UserAccountStatusChangedEvent(userId, ForceLogoutReason.ROLE_CHANGE, true));
+          new UserAccountStatusChangedEvent(UUID.randomUUID(), Instant.now(), userId,
+              ForceLogoutReason.ROLE_CHANGE, true));
 
       eventPublisher.publishEvent(
           new UserSearchIndexEvent(
@@ -91,7 +92,9 @@ public class AdminService {
     if (previousLocked != locked) {
       ForceLogoutReason reason =
           locked ? ForceLogoutReason.ACCOUNT_LOCKED : ForceLogoutReason.ACCOUNT_UNLOCKED;
-      eventPublisher.publishEvent(new UserAccountStatusChangedEvent(userId, reason, locked));
+      eventPublisher.publishEvent(
+          new UserAccountStatusChangedEvent(UUID.randomUUID(), Instant.now(), userId, reason,
+              locked));
 
       eventPublisher.publishEvent(
           new UserSearchIndexEvent(

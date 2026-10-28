@@ -14,6 +14,8 @@ public class PlaylistEventProducer {
   private final KafkaTemplate<String, Object> kafkaTemplate;
 
   private final String playlistSearchIndexTopic;
+  private final String playlistSubscribedTopic;
+  private final String playlistCreatedTopic;
 
   public PlaylistEventProducer(
       KafkaTemplate<String, Object> kafkaTemplate,
@@ -21,6 +23,18 @@ public class PlaylistEventProducer {
   ) {
     this.kafkaTemplate = kafkaTemplate;
     this.playlistSearchIndexTopic = properties.topics().playlistSearchIndex();
+    this.playlistSubscribedTopic = properties.topics().playlistSubscribed();
+    this.playlistCreatedTopic = properties.topics().playlistCreated();
+  }
+
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  public void on(PlaylistSubscribedEvent event) {
+    kafkaTemplate.send(playlistSubscribedTopic, event.playlistId().toString(), event);
+  }
+
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  public void on(PlaylistCreatedEvent event) {
+    kafkaTemplate.send(playlistCreatedTopic, event.playlistId().toString(), event);
   }
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)

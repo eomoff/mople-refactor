@@ -29,7 +29,6 @@ public class FollowEventConsumer {
       return;
     }
 
-    // 같은 사람이 다시 팔로우해도 알림은 한 번만 만든다.
     notificationCreator.createNotification(
         event.followeeId(),
         new NotificationTemplate(
