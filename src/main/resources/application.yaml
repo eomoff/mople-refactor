@@ -50,7 +50,6 @@ spring:
     producer:
       acks: all
       properties:
-        spring.json.type.mapping: ${mople.kafka.type-mapping}
         enable.idempotence: true
         max.block.ms: 3000          # Producer가 send() 호출하고 버퍼에 메세지를 집어넣기까지 최대시간, 기본은 60초
         request.timeout.ms: 10000
@@ -61,7 +60,6 @@ spring:
       group-id: mople
       properties:
         spring.json.trusted.packages: "com.codeit.mople.domain.*"
-        spring.json.type.mapping: ${mople.kafka.type-mapping}
   mail:
     properties:
       mail.smtp.auth: true
@@ -136,20 +134,6 @@ mople:
       es-sync-group-id: mople-dm-es-sync-group
     failed-events:
       max-entries: 1000 # 스트림 보관 상한(근사). Redis를 캐시,분산 락,SSE와 같이 쓰고 있어서 상한을 둠
-    # 메시지 헤더(TypeId)의 이름. 프로듀서,컨슈머가 같은 값을 보고 컨그래야 컨슈머가 어떤객체로 만들어야하는지 알 수 있음
-    type-mapping: >-
-      follow-created.v1:com.codeit.mople.domain.follow.event.FollowCreatedEvent,
-      playlist-content-added.v1:com.codeit.mople.domain.playlist.event.PlaylistContentAddedEvent,
-      playlist-search-index.v1:com.codeit.mople.domain.playlist.event.PlaylistSearchIndexEvent,
-      playlist-search-index-delete.v1:com.codeit.mople.domain.playlist.event.PlaylistSearchIndexDeleteEvent,
-      content-search-index.v1:com.codeit.mople.domain.content.event.ContentSearchIndexEvent,
-      content-search-index-delete.v1:com.codeit.mople.domain.content.event.ContentSearchIndexDeleteEvent,
-      user-search-index.v1:com.codeit.mople.domain.user.event.UserSearchIndexEvent,
-      review-created.v1:com.codeit.mople.domain.review.event.ReviewCreatedEvent,
-      review-updated.v1:com.codeit.mople.domain.review.event.ReviewUpdatedEvent,
-      review-deleted.v1:com.codeit.mople.domain.review.event.ReviewDeletedEvent,
-      notification-created.v1:com.codeit.mople.domain.notification.event.NotificationCreatedEvent,
-      direct-message-created.v1:com.codeit.mople.domain.directmessage.event.DirectMessageCreatedEvent
 
   elasticsearch:
     dm-retention-days: 365

@@ -174,8 +174,8 @@ class KafkaPublishSmokeTest {
   class TypeHeader {
 
     @Test
-    @DisplayName("팔로우 생성 이벤트 헤더에 follow-created.v1이 실리는지")
-    void carriesAliasForFollowCreated() {
+    @DisplayName("팔로우 생성 이벤트 헤더에 클래스 이름이 실리는지")
+    void carriesClassNameForFollowCreated() {
       // given
       UUID followeeId = UUID.randomUUID();
 
@@ -191,13 +191,13 @@ class KafkaPublishSmokeTest {
         ConsumerRecord<String, String> record =
             KafkaTestUtils.getSingleRecord(consumer, FOLLOW_TOPIC, Duration.ofSeconds(10));
 
-        assertThat(typeIdOf(record)).isEqualTo("follow-created.v1");
+        assertThat(typeIdOf(record)).isEqualTo(FollowCreatedEvent.class.getName());
       }
     }
 
     @Test
-    @DisplayName("콘텐츠 추가 이벤트 헤더에 playlist-content-added.v1이 실리는지")
-    void carriesAliasForPlaylistContentAdded() {
+    @DisplayName("콘텐츠 추가 이벤트 헤더에 클래스 이름이 실리는지")
+    void carriesClassNameForPlaylistContentAdded() {
       // given
       UUID playlistId = UUID.randomUUID();
 
@@ -214,7 +214,7 @@ class KafkaPublishSmokeTest {
             KafkaTestUtils.getSingleRecord(consumer, PLAYLIST_CONTENT_TOPIC,
                 Duration.ofSeconds(10));
 
-        assertThat(typeIdOf(record)).isEqualTo("playlist-content-added.v1");
+        assertThat(typeIdOf(record)).isEqualTo(PlaylistContentAddedEvent.class.getName());
       }
     }
 
@@ -230,35 +230,35 @@ class KafkaPublishSmokeTest {
       return Stream.of(
           arguments(new PlaylistSearchIndexEvent(UUID.randomUUID(), Instant.now(), id, "플리",
                   Instant.now(), 3L),
-              PLAYLIST_SEARCH_INDEX_TOPIC, "playlist-search-index.v1"),
+              PLAYLIST_SEARCH_INDEX_TOPIC, PlaylistSearchIndexEvent.class.getName()),
           arguments(new PlaylistSearchIndexDeleteEvent(UUID.randomUUID(), Instant.now(), id),
-              PLAYLIST_SEARCH_INDEX_TOPIC, "playlist-search-index-delete.v1"),
+              PLAYLIST_SEARCH_INDEX_TOPIC, PlaylistSearchIndexDeleteEvent.class.getName()),
           arguments(new ContentSearchIndexEvent(UUID.randomUUID(), Instant.now(), id, "콘텐츠",
                   ContentType.MOVIE, 4.5, 10L, Instant.now()),
-              CONTENT_SEARCH_INDEX_TOPIC, "content-search-index.v1"),
+              CONTENT_SEARCH_INDEX_TOPIC, ContentSearchIndexEvent.class.getName()),
           arguments(new ContentSearchIndexDeleteEvent(UUID.randomUUID(), Instant.now(), id),
-              CONTENT_SEARCH_INDEX_TOPIC, "content-search-index-delete.v1"),
+              CONTENT_SEARCH_INDEX_TOPIC, ContentSearchIndexDeleteEvent.class.getName()),
           arguments(
               new UserSearchIndexEvent(UUID.randomUUID(), Instant.now(), id, "a@mople.com", "이름",
                   Instant.now(), false, "USER"),
-              USER_SEARCH_INDEX_TOPIC, "user-search-index.v1"),
+              USER_SEARCH_INDEX_TOPIC, UserSearchIndexEvent.class.getName()),
           arguments(new ReviewCreatedEvent(UUID.randomUUID(), Instant.now(), id, 4.5),
-              REVIEW_CREATED_TOPIC, "review-created.v1"),
+              REVIEW_CREATED_TOPIC, ReviewCreatedEvent.class.getName()),
           arguments(new ReviewUpdatedEvent(UUID.randomUUID(), Instant.now(), id, 3.0, 4.5),
-              REVIEW_UPDATED_TOPIC, "review-updated.v1"),
+              REVIEW_UPDATED_TOPIC, ReviewUpdatedEvent.class.getName()),
           arguments(new ReviewDeletedEvent(UUID.randomUUID(), Instant.now(), id, 4.5),
-              REVIEW_DELETED_TOPIC, "review-deleted.v1"),
+              REVIEW_DELETED_TOPIC, ReviewDeletedEvent.class.getName()),
           arguments(new DirectMessageCreatedEvent(UUID.randomUUID(), Instant.now(), id, id),
-              DIRECT_MESSAGE_TOPIC, "direct-message-created.v1"),
+              DIRECT_MESSAGE_TOPIC, DirectMessageCreatedEvent.class.getName()),
           arguments(new NotificationCreatedEvent(UUID.randomUUID(), Instant.now(), id, id),
-              NOTIFICATION_TOPIC, "notification-created.v1")
+              NOTIFICATION_TOPIC, NotificationCreatedEvent.class.getName())
       );
     }
 
     @ParameterizedTest(name = "{2}")
     @MethodSource("events")
-    @DisplayName("커밋 뒤 제 토픽으로 나가고 헤더에 제 타입 이름이 실리는지")
-    void publishesWithTypeName(Object event, String topic, String typeName) throws Exception {
+    @DisplayName("커밋 뒤 제 토픽으로 나가고 헤더에 제 클래스 이름이 실리는지")
+    void publishesWithClassName(Object event, String topic, String className) throws Exception {
       try (Consumer<String, String> consumer = consumerFor(topic)) {
         // when
         transactionTemplate.executeWithoutResult(status -> eventPublisher.publishEvent(event));
@@ -267,7 +267,7 @@ class KafkaPublishSmokeTest {
         ConsumerRecord<String, String> record =
             KafkaTestUtils.getSingleRecord(consumer, topic, Duration.ofSeconds(10));
 
-        assertThat(typeIdOf(record)).isEqualTo(typeName);
+        assertThat(typeIdOf(record)).isEqualTo(className);
         assertThat(record.value()).isEqualTo(objectMapper.writeValueAsString(event));
       }
     }
