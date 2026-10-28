@@ -1,5 +1,6 @@
 package com.codeit.mople.domain.user.admin.service;
 
+import com.codeit.mople.domain.auth.repository.AccountLockRepository;
 import com.codeit.mople.domain.auth.repository.RefreshTokenRepository;
 import com.codeit.mople.domain.auth.repository.SessionTokenRepository;
 import com.codeit.mople.domain.auth.security.SecurityUtils;
@@ -32,6 +33,7 @@ public class AdminService {
   private final ApplicationEventPublisher eventPublisher;
   private final SessionTokenRepository sessionTokenRepository;
   private final RefreshTokenRepository refreshTokenRepository;
+  private final AccountLockRepository accountLockRepository;
 
   @Caching(
       evict = {
@@ -90,6 +92,13 @@ public class AdminService {
       user.unlock();
     }
     if (previousLocked != locked) {
+      if (locked) {
+        sessionTokenRepository.invalidate(userId);
+        refreshTokenRepository.invalidate(userId);
+        accountLockRepository.lock(userId);
+      } else {
+        accountLockRepository.unlock(userId);
+      }
       ForceLogoutReason reason =
           locked ? ForceLogoutReason.ACCOUNT_LOCKED : ForceLogoutReason.ACCOUNT_UNLOCKED;
       eventPublisher.publishEvent(

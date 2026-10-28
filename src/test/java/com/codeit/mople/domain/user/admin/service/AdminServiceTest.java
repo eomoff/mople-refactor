@@ -4,9 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
+import com.codeit.mople.domain.auth.repository.AccountLockRepository;
 import com.codeit.mople.domain.auth.repository.RefreshTokenRepository;
 import com.codeit.mople.domain.auth.repository.SessionTokenRepository;
 import com.codeit.mople.domain.auth.security.CustomUserDetails;
@@ -31,6 +34,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -52,6 +56,9 @@ class AdminServiceTest {
 
   @Mock
   private RefreshTokenRepository refreshTokenRepository;
+
+  @Mock
+  private AccountLockRepository accountLockRepository;
 
   @Captor
   private ArgumentCaptor<UserAccountStatusChangedEvent> eventCaptor;
@@ -187,6 +194,9 @@ class AdminServiceTest {
 
       // then
       assertThat(user.isLocked()).isTrue();
+      verify(sessionTokenRepository).invalidate(userId);
+      verify(refreshTokenRepository).invalidate(userId);
+      verify(accountLockRepository).lock(userId);
       verify(eventPublisher).publishEvent(eventCaptor.capture());
       assertThat(eventCaptor.getValue().userId()).isEqualTo(userId);
       assertThat(eventCaptor.getValue().reason()).isEqualTo(ForceLogoutReason.ACCOUNT_LOCKED);
@@ -205,10 +215,28 @@ class AdminServiceTest {
 
       // then
       assertThat(user.isLocked()).isFalse();
+      verify(accountLockRepository).unlock(userId);
+      verify(sessionTokenRepository, never()).invalidate(any());
+      verify(refreshTokenRepository, never()).invalidate(any());
       verify(eventPublisher).publishEvent(eventCaptor.capture());
       assertThat(eventCaptor.getValue().userId()).isEqualTo(userId);
       assertThat(eventCaptor.getValue().reason()).isEqualTo(ForceLogoutReason.ACCOUNT_UNLOCKED);
       assertThat(eventCaptor.getValue().sessionInvalidated()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Redis 반영에 실패하면 예외를 그대로 던지고 이벤트를 발행하지 않는다")
+    void Redis_반영에_실패하면_예외를_그대로_던지고_이벤트를_발행하지_않는다() {
+      // given
+      given(userRepository.findById(userId)).willReturn(Optional.of(user));
+      willThrow(new RedisConnectionFailureException("redis down"))
+          .given(accountLockRepository).lock(userId);
+
+      // when & then - 예외가 전파되어야 @Transactional이 잠금 변경을 롤백함
+      assertThatExceptionOfType(RedisConnectionFailureException.class)
+          .isThrownBy(() -> adminService.changeUserLocked(userId, true));
+
+      verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
@@ -224,6 +252,7 @@ class AdminServiceTest {
       // then
       assertThat(user.isLocked()).isTrue();
       verify(eventPublisher, never()).publishEvent(any());
+      verifyNoInteractions(accountLockRepository);
     }
 
     @Test
@@ -238,6 +267,7 @@ class AdminServiceTest {
       // then
       assertThat(user.isLocked()).isFalse();
       verify(eventPublisher, never()).publishEvent(any());
+      verifyNoInteractions(accountLockRepository);
     }
 
     @Test
