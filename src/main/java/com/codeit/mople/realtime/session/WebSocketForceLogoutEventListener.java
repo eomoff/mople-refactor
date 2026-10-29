@@ -4,7 +4,6 @@ import com.codeit.mople.domain.user.admin.event.UserAccountStatusChangedEvent;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -16,7 +15,6 @@ public class WebSocketForceLogoutEventListener {
 
   private final WebSocketSessionRegistryService registryService;
 
-  @Async
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void handleUserAccountStatusChanged(UserAccountStatusChangedEvent event) {
     // ACCOUNT_UNLOCKED는 sessionInvalidated=false로 발행되므로 여기서는 걸러진다.
