@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.codeit.mople.domain.notification.entity.NotificationTemplate;
 import com.codeit.mople.domain.notification.entity.NotificationType;
@@ -12,7 +11,6 @@ import com.codeit.mople.domain.notification.service.NotificationCreator;
 import com.codeit.mople.domain.playlist.service.PlaylistService;
 import com.codeit.mople.domain.user.exception.UserErrorCode;
 import com.codeit.mople.domain.user.exception.UserException;
-import com.codeit.mople.global.event.processed.ProcessedEventRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -32,9 +30,6 @@ class PlaylistContentAddedEventConsumerTest {
 
   @Mock
   private NotificationCreator notificationCreator;
-
-  @Mock
-  private ProcessedEventRepository processedEventRepository;
 
   @InjectMocks
   private PlaylistContentAddedEventConsumer eventConsumer;
@@ -63,7 +58,6 @@ class PlaylistContentAddedEventConsumerTest {
         eventId, Instant.now(), playlistContentId, playlistId, contentId, "테스트 플레이리스트"
     );
 
-    given(processedEventRepository.insertIfAbsent(eventId)).willReturn(1);
     given(playlistService.getSubscriberIds(playlistId))
         .willReturn(List.of(subscriberA, subscriberB));
 
@@ -71,7 +65,6 @@ class PlaylistContentAddedEventConsumerTest {
     eventConsumer.handle(event);
 
     // then
-    verify(processedEventRepository).insertIfAbsent(eventId);
     verify(notificationCreator).createNotification(
         subscriberA,
         new NotificationTemplate(
@@ -102,7 +95,6 @@ class PlaylistContentAddedEventConsumerTest {
     );
     UserException failure = new UserException(UserErrorCode.USER_NOT_FOUND);
 
-    given(processedEventRepository.insertIfAbsent(eventId)).willReturn(1);
     given(playlistService.getSubscriberIds(playlistId))
         .willReturn(List.of(subscriberA, subscriberB));
     willThrow(failure)
@@ -118,24 +110,5 @@ class PlaylistContentAddedEventConsumerTest {
 
     // when & then
     assertThatThrownBy(() -> eventConsumer.handle(event)).isSameAs(failure);
-  }
-
-  @Test
-  @DisplayName("이미 처리된 이벤트는 알림을 생성하지 않고 스킵한다")
-  void handle_success_already_processed_skip() {
-    // given
-    UUID eventId = UUID.randomUUID();
-    PlaylistContentAddedEvent event = new PlaylistContentAddedEvent(
-        eventId, Instant.now(), playlistContentId, playlistId, contentId, "테스트 플레이리스트"
-    );
-
-    given(processedEventRepository.insertIfAbsent(eventId)).willReturn(0);
-
-    // when
-    eventConsumer.handle(event);
-
-    // then
-    verify(processedEventRepository).insertIfAbsent(eventId);
-    verifyNoInteractions(playlistService, notificationCreator);
   }
 }

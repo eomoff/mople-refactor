@@ -5,8 +5,6 @@ import com.codeit.mople.domain.notification.entity.NotificationTemplate;
 import com.codeit.mople.domain.notification.entity.NotificationType;
 import com.codeit.mople.domain.notification.service.NotificationCreator;
 import com.codeit.mople.global.config.KafkaProperties;
-import com.codeit.mople.global.event.processed.ProcessedEventRepository;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -20,8 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
 @ConditionalOnProperty(prefix = KafkaProperties.PREFIX, name = "enabled", havingValue = "true")
 public class ReviewEventConsumer {
 
-  private final ProcessedEventRepository processedEventRepository;
-
   private final NotificationCreator notificationCreator;
 
   private final FollowService followService;
@@ -31,10 +27,6 @@ public class ReviewEventConsumer {
   public void handle(ReviewWrittenEvent event) {
     log.debug("리뷰 작성 팔로워 알림 시도: reviewId={}, authorId={}",
         event.reviewId(), event.authorId());
-
-    if (checkAndRecordProcessedEvent(event.eventId())) {
-      return;
-    }
 
     followService.getFollowerIds(event.authorId())
         .forEach(followerId -> notificationCreator.createNotification(
@@ -49,19 +41,6 @@ public class ReviewEventConsumer {
 
     log.info("리뷰 작성 팔로워 알림 완료: reviewId={}, authorId={}",
         event.reviewId(), event.authorId());
-  }
-
-
-  private boolean checkAndRecordProcessedEvent(UUID eventId) {
-    // 이미 해당 eventId가 존재하면 스킵
-    int inserted = processedEventRepository.insertIfAbsent(eventId);
-
-    if (inserted == 0) {
-      log.info("이미 처리된 이벤트입니다: eventId={}", eventId);
-      return true;
-    }
-
-    return false;
   }
 
 }

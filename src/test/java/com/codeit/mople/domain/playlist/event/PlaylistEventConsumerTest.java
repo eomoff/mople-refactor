@@ -9,7 +9,6 @@ import com.codeit.mople.domain.follow.service.FollowService;
 import com.codeit.mople.domain.notification.entity.NotificationTemplate;
 import com.codeit.mople.domain.notification.entity.NotificationType;
 import com.codeit.mople.domain.notification.service.NotificationCreator;
-import com.codeit.mople.global.event.processed.ProcessedEventRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -30,9 +29,6 @@ class PlaylistEventConsumerTest {
 
   @Mock
   private FollowService followService;
-
-  @Mock
-  private ProcessedEventRepository processedEventRepository;
 
   @InjectMocks
   private PlaylistEventConsumer eventConsumer;
@@ -60,13 +56,10 @@ class PlaylistEventConsumerTest {
           eventId, Instant.now(), ownerId, playlistId, subscriberId, "구독자유저", "테스트 플레이리스트"
       );
 
-      given(processedEventRepository.insertIfAbsent(eventId)).willReturn(1);
-
       // when
       eventConsumer.handle(event);
 
       // then
-      verify(processedEventRepository).insertIfAbsent(eventId);
       verify(notificationCreator).createNotification(
           ownerId,
           new NotificationTemplate(
@@ -76,26 +69,6 @@ class PlaylistEventConsumerTest {
           NotificationType.PLAYLIST_SUBSCRIBED,
           playlistId + ":" + subscriberId
       );
-    }
-
-    @Test
-    @DisplayName("이미 처리된 이벤트는 알림을 생성하지 않고 스킵한다")
-    void handle_success_already_processed_skip() {
-      // given
-      UUID eventId = UUID.randomUUID();
-      PlaylistSubscribedEvent event = new PlaylistSubscribedEvent(
-          eventId, Instant.now(), ownerId, playlistId, UUID.randomUUID(), "구독자유저",
-          "테스트 플레이리스트"
-      );
-
-      given(processedEventRepository.insertIfAbsent(eventId)).willReturn(0);
-
-      // when
-      eventConsumer.handle(event);
-
-      // then
-      verify(processedEventRepository).insertIfAbsent(eventId);
-      verifyNoInteractions(notificationCreator);
     }
   }
 
@@ -114,7 +87,6 @@ class PlaylistEventConsumerTest {
           eventId, Instant.now(), playlistId, ownerId, "플레이리스트_생성자", "새 플레이리스트"
       );
 
-      given(processedEventRepository.insertIfAbsent(eventId)).willReturn(1);
       given(followService.getFollowerIds(ownerId)).willReturn(List.of(followerA, followerB));
 
       // when
@@ -141,7 +113,6 @@ class PlaylistEventConsumerTest {
           eventId, Instant.now(), playlistId, ownerId, "플레이리스트_생성자", "새 플레이리스트"
       );
 
-      given(processedEventRepository.insertIfAbsent(eventId)).willReturn(1);
       given(followService.getFollowerIds(ownerId)).willReturn(List.of());
 
       // when
@@ -150,25 +121,6 @@ class PlaylistEventConsumerTest {
       // then
       verify(followService).getFollowerIds(ownerId);
       verifyNoInteractions(notificationCreator);
-    }
-
-    @Test
-    @DisplayName("이미 처리된 이벤트는 알림을 생성하지 않고 스킵한다")
-    void handle_success_already_processed_skip() {
-      // given
-      UUID eventId = UUID.randomUUID();
-      PlaylistCreatedEvent event = new PlaylistCreatedEvent(
-          eventId, Instant.now(), playlistId, ownerId, "플레이리스트_생성자", "새 플레이리스트"
-      );
-
-      given(processedEventRepository.insertIfAbsent(eventId)).willReturn(0);
-
-      // when
-      eventConsumer.handle(event);
-
-      // then
-      verify(processedEventRepository).insertIfAbsent(eventId);
-      verifyNoInteractions(followService, notificationCreator);
     }
   }
 }

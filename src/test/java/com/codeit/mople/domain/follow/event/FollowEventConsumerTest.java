@@ -1,13 +1,10 @@
 package com.codeit.mople.domain.follow.event;
 
-import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.codeit.mople.domain.notification.entity.NotificationTemplate;
 import com.codeit.mople.domain.notification.entity.NotificationType;
 import com.codeit.mople.domain.notification.service.NotificationCreator;
-import com.codeit.mople.global.event.processed.ProcessedEventRepository;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,9 +20,6 @@ class FollowEventConsumerTest {
 
   @Mock
   private NotificationCreator notificationCreator;
-
-  @Mock
-  private ProcessedEventRepository processedEventRepository;
 
   @InjectMocks
   private FollowEventConsumer eventConsumer;
@@ -50,13 +44,10 @@ class FollowEventConsumerTest {
         eventId, Instant.now(), followId, followeeId, followerId, "팔로워"
     );
 
-    given(processedEventRepository.insertIfAbsent(eventId)).willReturn(1);
-
     // when
     eventConsumer.handle(event);
 
     // then
-    verify(processedEventRepository).insertIfAbsent(eventId);
     verify(notificationCreator).createNotification(
         followeeId,
         new NotificationTemplate(
@@ -66,24 +57,5 @@ class FollowEventConsumerTest {
         NotificationType.FOLLOW_CREATED,
         followerId.toString()
     );
-  }
-
-  @Test
-  @DisplayName("이미 처리된 이벤트는 알림을 생성하지 않고 스킵한다")
-  void handle_success_already_processed_skip() {
-    // given
-    UUID eventId = UUID.randomUUID();
-    FollowCreatedEvent event = new FollowCreatedEvent(
-        eventId, Instant.now(), followId, followeeId, followerId, "팔로워"
-    );
-
-    given(processedEventRepository.insertIfAbsent(eventId)).willReturn(0);
-
-    // when
-    eventConsumer.handle(event);
-
-    // then
-    verify(processedEventRepository).insertIfAbsent(eventId);
-    verifyNoInteractions(notificationCreator);
   }
 }
