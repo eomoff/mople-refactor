@@ -1,6 +1,6 @@
 package com.codeit.mople.domain.playlist.event;
 
-import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
@@ -93,18 +93,19 @@ class PlaylistContentAddedEventConsumerTest {
   }
 
   @Test
-  @DisplayName("한 구독자의 알림 생성이 실패해도 예외를 전파하지 않고 나머지 구독자는 알림을 받는다")
-  void handle_success_continuesOtherSubscribers_whenOneNotificationFails() {
+  @DisplayName("한 구독자의 알림 생성이 실패하면 예외를 삼키지 않고 그대로 던진다")
+  void handle_fail_propagatesException_whenOneNotificationFails() {
     // given
     UUID eventId = UUID.randomUUID();
     PlaylistContentAddedEvent event = new PlaylistContentAddedEvent(
         eventId, Instant.now(), playlistContentId, playlistId, contentId, "테스트 플레이리스트"
     );
+    UserException failure = new UserException(UserErrorCode.USER_NOT_FOUND);
 
     given(processedEventRepository.insertIfAbsent(eventId)).willReturn(1);
     given(playlistService.getSubscriberIds(playlistId))
         .willReturn(List.of(subscriberA, subscriberB));
-    willThrow(new UserException(UserErrorCode.USER_NOT_FOUND))
+    willThrow(failure)
         .given(notificationCreator).createNotification(
             subscriberA,
             new NotificationTemplate(
@@ -116,17 +117,7 @@ class PlaylistContentAddedEventConsumerTest {
         );
 
     // when & then
-    assertThatCode(() -> eventConsumer.handle(event)).doesNotThrowAnyException();
-
-    verify(notificationCreator).createNotification(
-        subscriberB,
-        new NotificationTemplate(
-            "구독한 플레이리스트에 새 콘텐츠가 추가되었습니다.",
-            "테스트 플레이리스트에 새 콘텐츠가 추가되었습니다."
-        ),
-        NotificationType.PLAYLIST_CONTENT_ADDED,
-        playlistContentId.toString()
-    );
+    assertThatThrownBy(() -> eventConsumer.handle(event)).isSameAs(failure);
   }
 
   @Test
@@ -139,15 +130,12 @@ class PlaylistContentAddedEventConsumerTest {
     );
 
     given(processedEventRepository.insertIfAbsent(eventId)).willReturn(0);
-    given(playlistService.getSubscriberIds(playlistId))
-        .willReturn(List.of(subscriberA, subscriberB));
 
     // when
     eventConsumer.handle(event);
 
     // then
-    verify(playlistService).getSubscriberIds(playlistId);
     verify(processedEventRepository).insertIfAbsent(eventId);
-    verifyNoInteractions(notificationCreator);
+    verifyNoInteractions(playlistService, notificationCreator);
   }
 }

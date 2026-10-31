@@ -17,8 +17,8 @@ class ProcessedEventRepositoryTest {
   @Autowired
   private ProcessedEventRepository processedEventRepository;
 
-  // Kafka Consumer의 handle()이 @Transactional 없이 호출하는 경우가 있어(예:
-  // PlaylistContentAddedEventConsumer), 호출부 트랜잭션 유무와 무관하게 insertIfAbsent가
+  // Kafka Consumer의 handle()이 @Transactional 없이 호출하는 경우가 있어,
+  // 호출부 트랜잭션 유무와 무관하게 insertIfAbsent가
   // 항상 동작해야 한다. 이 메서드 자체의 @Transactional을 제거하면 TransactionRequiredException으로
   // 회귀하므로 이를 잡아내기 위한 테스트.
   @Test

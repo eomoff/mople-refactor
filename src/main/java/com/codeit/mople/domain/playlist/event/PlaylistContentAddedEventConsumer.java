@@ -6,13 +6,13 @@ import com.codeit.mople.domain.notification.service.NotificationCreator;
 import com.codeit.mople.domain.playlist.service.PlaylistService;
 import com.codeit.mople.global.config.KafkaProperties;
 import com.codeit.mople.global.event.processed.ProcessedEventRepository;
-import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Component
@@ -26,35 +26,25 @@ public class PlaylistContentAddedEventConsumer {
 
   private final ProcessedEventRepository processedEventRepository;
 
+  @Transactional
   @KafkaListener(topics = "${spring.kafka.topics.playlist-content-added}")
   public void handle(PlaylistContentAddedEvent event) {
-    List<UUID> subscriberIds = playlistService.getSubscriberIds(event.playlistId());
-
     if (checkAndRecordProcessedEvent(event.eventId())) {
       return;
     }
 
-    subscriberIds.forEach(subscriberId -> createNotificationSafely(subscriberId, event));
+    playlistService.getSubscriberIds(event.playlistId())
+        .forEach(subscriberId -> notificationCreator.createNotification(
+            subscriberId,
+            new NotificationTemplate(
+                "구독한 플레이리스트에 새 콘텐츠가 추가되었습니다.",
+                event.playlistTitle() + "에 새 콘텐츠가 추가되었습니다."
+            ),
+            NotificationType.PLAYLIST_CONTENT_ADDED,
+            event.playlistContentId().toString()
+        ));
 
     log.info("플레이리스트 콘텐츠 추가 이벤트 처리 완료: playlistId={}", event.playlistId());
-  }
-
-  // 한 구독자의 알림 생성 실패가 나머지 구독자 처리를 막지 않도록 개별적으로 예외를 흡수한다.
-  private void createNotificationSafely(UUID subscriberId, PlaylistContentAddedEvent event) {
-    try {
-      notificationCreator.createNotification(
-          subscriberId,
-          new NotificationTemplate(
-              "구독한 플레이리스트에 새 콘텐츠가 추가되었습니다.",
-              event.playlistTitle() + "에 새 콘텐츠가 추가되었습니다."
-          ),
-          NotificationType.PLAYLIST_CONTENT_ADDED,
-          event.playlistContentId().toString()
-      );
-    } catch (Exception e) {
-      log.error("구독자 알림 생성 실패: subscriberId={}, playlistId={}", subscriberId, event.playlistId(),
-          e);
-    }
   }
 
   private boolean checkAndRecordProcessedEvent(UUID eventId) {
