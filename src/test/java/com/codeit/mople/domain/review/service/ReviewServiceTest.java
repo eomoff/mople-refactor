@@ -9,6 +9,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import com.codeit.mople.domain.auth.security.CustomUserDetails;
 import com.codeit.mople.domain.content.entity.Content;
@@ -22,9 +23,6 @@ import com.codeit.mople.domain.review.dto.request.ReviewUpdateRequest;
 import com.codeit.mople.domain.review.dto.response.ReviewCursorResponse;
 import com.codeit.mople.domain.review.dto.response.ReviewResponse;
 import com.codeit.mople.domain.review.entity.Review;
-import com.codeit.mople.domain.review.event.ReviewCreatedEvent;
-import com.codeit.mople.domain.review.event.ReviewDeletedEvent;
-import com.codeit.mople.domain.review.event.ReviewUpdatedEvent;
 import com.codeit.mople.domain.review.event.ReviewWrittenEvent;
 import com.codeit.mople.domain.review.exception.ReviewErrorCode;
 import com.codeit.mople.domain.review.exception.ReviewException;
@@ -187,15 +185,9 @@ public class ReviewServiceTest {
                   && writtenEvent.authorName().equals("test")
           )
       );
+      verifyNoMoreInteractions(eventPublisher);
 
-      verify(eventPublisher).publishEvent(
-          argThat((Object event) ->
-              event instanceof ReviewCreatedEvent createdEvent
-                  && createdEvent.eventId() != null
-                  && createdEvent.contentId().equals(contentId)
-                  && createdEvent.rating() == reviewRating
-          )
-      );
+      verify(contentRepository).increaseRating(contentId, reviewRating);
     }
 
     @Test
@@ -531,15 +523,8 @@ public class ReviewServiceTest {
 
       verify(reviewRepository).findById(review1Id);
 
-      verify(eventPublisher).publishEvent(
-          argThat((Object event) ->
-              event instanceof ReviewUpdatedEvent updatedEvent
-                  && updatedEvent.eventId() != null
-                  && updatedEvent.contentId().equals(contentId)
-                  && updatedEvent.oldRating() == 5.0
-                  && updatedEvent.newRating() == 3.0
-          )
-      );
+      verify(contentRepository).updateRating(contentId, 5.0, 3.0);
+      verifyNoInteractions(eventPublisher);
     }
 
     @Test
@@ -608,15 +593,8 @@ public class ReviewServiceTest {
       // then
       assertThat(result.text()).isEqualTo(updateRequest.text());
       assertThat(result.rating()).isEqualTo(updateRequest.rating());
-      verify(eventPublisher).publishEvent(
-          argThat((Object event) ->
-              event instanceof ReviewUpdatedEvent updatedEvent
-                  && updatedEvent.eventId() != null
-                  && updatedEvent.contentId().equals(contentId)
-                  && updatedEvent.oldRating() == reviewRating
-                  && updatedEvent.newRating() == updateRequest.rating()
-          )
-      );
+      verify(contentRepository).updateRating(contentId, reviewRating, updateRequest.rating());
+      verifyNoInteractions(eventPublisher);
     }
   }
 
@@ -648,14 +626,8 @@ public class ReviewServiceTest {
       verify(reviewRepository).findById(review1Id);
       verify(reviewRepository).delete(review1);
 
-      verify(eventPublisher).publishEvent(
-          argThat((Object event) ->
-              event instanceof ReviewDeletedEvent deletedEvent
-                  && deletedEvent.eventId() != null
-                  && deletedEvent.contentId().equals(contentId)
-                  && deletedEvent.rating() == reviewRating
-          )
-      );
+      verify(contentRepository).decreaseRating(contentId, reviewRating);
+      verifyNoInteractions(eventPublisher);
     }
 
     @Test
@@ -723,14 +695,8 @@ public class ReviewServiceTest {
 
       // then
       verify(reviewRepository).delete(review1);
-      verify(eventPublisher).publishEvent(
-          argThat((Object event) ->
-              event instanceof ReviewDeletedEvent deletedEvent
-                  && deletedEvent.eventId() != null
-                  && deletedEvent.contentId().equals(contentId)
-                  && deletedEvent.rating() == reviewRating
-          )
-      );
+      verify(contentRepository).decreaseRating(contentId, reviewRating);
+      verifyNoInteractions(eventPublisher);
     }
   }
 

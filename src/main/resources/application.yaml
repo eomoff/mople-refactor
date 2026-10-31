@@ -38,9 +38,6 @@ spring:
     topics:
       follow-created: mople.follow.created.v1
       playlist-content-added: mople.playlist.content-added.v1
-      review-created: mople.review.created.v1
-      review-updated: mople.review.updated.v1
-      review-deleted: mople.review.deleted.v1
       direct-message-created: mople.direct-message.created.v1
       notification-created: mople.notification.created.v1
       content-search-index: mople.content-search-index-events.v1

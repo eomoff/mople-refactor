@@ -12,9 +12,6 @@ import com.codeit.mople.domain.review.dto.request.ReviewUpdateRequest;
 import com.codeit.mople.domain.review.dto.response.ReviewCursorResponse;
 import com.codeit.mople.domain.review.dto.response.ReviewResponse;
 import com.codeit.mople.domain.review.entity.Review;
-import com.codeit.mople.domain.review.event.ReviewCreatedEvent;
-import com.codeit.mople.domain.review.event.ReviewDeletedEvent;
-import com.codeit.mople.domain.review.event.ReviewUpdatedEvent;
 import com.codeit.mople.domain.review.event.ReviewWrittenEvent;
 import com.codeit.mople.domain.review.exception.ReviewErrorCode;
 import com.codeit.mople.domain.review.exception.ReviewException;
@@ -29,7 +26,6 @@ import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -99,12 +95,7 @@ public class ReviewService {
         author.getName()
     ));
 
-    eventPublisher.publishEvent(new ReviewCreatedEvent(
-        UUID.randomUUID(),
-        savedReview.getCreatedAt(),
-        content.getId(),
-        savedReview.getRating()
-    ));
+    contentRepository.increaseRating(content.getId(), savedReview.getRating());
 
     ReviewResponse response = ReviewResponse.from(savedReview);
     log.info("리뷰 생성 완료: reviewId={}, authorId={}, contentId={}",
@@ -209,13 +200,7 @@ public class ReviewService {
 
     // 리뷰 내용만 변경 된 경우 계산하지 않음
     if (request.rating() != null) {
-      eventPublisher.publishEvent(new ReviewUpdatedEvent(
-          UUID.randomUUID(),
-          Instant.now(),
-          content.getId(),
-          oldRating,
-          review.getRating()
-      ));
+      contentRepository.updateRating(content.getId(), oldRating, review.getRating());
     }
 
     log.info("리뷰 수정 완료: reviewId={}, requesterId={}, contentId={}, rating={}",
@@ -244,17 +229,11 @@ public class ReviewService {
 
     Content content = review.getContent();
 
-    // 이벤트 처리를 위해 Review 삭제 전 미리 별점 정보를 가져옴
     double rating = review.getRating();
 
     reviewRepository.delete(review);
 
-    eventPublisher.publishEvent(new ReviewDeletedEvent(
-        UUID.randomUUID(),
-        Instant.now(),
-        content.getId(),
-        rating
-    ));
+    contentRepository.decreaseRating(content.getId(), rating);
 
     log.info(
         "리뷰 삭제 완료: reviewId={}, requesterId={}, contentId={}",

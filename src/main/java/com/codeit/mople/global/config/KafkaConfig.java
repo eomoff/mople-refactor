@@ -129,9 +129,6 @@ public class KafkaConfig {
     return new KafkaAdmin.NewTopics(Stream.of(
             topics.followCreated(),
             topics.playlistContentAdded(),
-            topics.reviewCreated(),
-            topics.reviewUpdated(),
-            topics.reviewDeleted(),
             topics.directMessageCreated(),
             topics.notificationCreated(),
             topics.contentSearchIndex(),

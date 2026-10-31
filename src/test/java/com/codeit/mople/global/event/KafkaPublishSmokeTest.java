@@ -15,9 +15,6 @@ import com.codeit.mople.domain.playlist.event.PlaylistCreatedEvent;
 import com.codeit.mople.domain.playlist.event.PlaylistSearchIndexDeleteEvent;
 import com.codeit.mople.domain.playlist.event.PlaylistSearchIndexEvent;
 import com.codeit.mople.domain.playlist.event.PlaylistSubscribedEvent;
-import com.codeit.mople.domain.review.event.ReviewCreatedEvent;
-import com.codeit.mople.domain.review.event.ReviewDeletedEvent;
-import com.codeit.mople.domain.review.event.ReviewUpdatedEvent;
 import com.codeit.mople.domain.review.event.ReviewWrittenEvent;
 import com.codeit.mople.domain.user.admin.enums.ForceLogoutReason;
 import com.codeit.mople.domain.user.admin.event.UserAccountStatusChangedEvent;
@@ -72,9 +69,6 @@ import org.springframework.util.ReflectionUtils;
     KafkaPublishSmokeTest.USER_SEARCH_INDEX_TOPIC,
     KafkaPublishSmokeTest.DIRECT_MESSAGE_TOPIC,
     KafkaPublishSmokeTest.NOTIFICATION_TOPIC,
-    KafkaPublishSmokeTest.REVIEW_CREATED_TOPIC,
-    KafkaPublishSmokeTest.REVIEW_UPDATED_TOPIC,
-    KafkaPublishSmokeTest.REVIEW_DELETED_TOPIC,
     KafkaPublishSmokeTest.USER_ACCOUNT_STATUS_CHANGED_TOPIC,
     KafkaPublishSmokeTest.PLAYLIST_SUBSCRIBED_TOPIC,
     KafkaPublishSmokeTest.PLAYLIST_CREATED_TOPIC,
@@ -91,9 +85,6 @@ class KafkaPublishSmokeTest {
   static final String USER_SEARCH_INDEX_TOPIC = "mople.user-search-index-events.v1";
   static final String DIRECT_MESSAGE_TOPIC = "mople.direct-message.created.v1";
   static final String NOTIFICATION_TOPIC = "mople.notification.created.v1";
-  static final String REVIEW_CREATED_TOPIC = "mople.review.created.v1";
-  static final String REVIEW_UPDATED_TOPIC = "mople.review.updated.v1";
-  static final String REVIEW_DELETED_TOPIC = "mople.review.deleted.v1";
   static final String USER_ACCOUNT_STATUS_CHANGED_TOPIC = "mople.user.account-status-changed.v1";
   static final String PLAYLIST_SUBSCRIBED_TOPIC = "mople.playlist.subscribed.v1";
   static final String PLAYLIST_CREATED_TOPIC = "mople.playlist.created.v1";
@@ -269,12 +260,6 @@ class KafkaPublishSmokeTest {
               new UserSearchIndexEvent(UUID.randomUUID(), Instant.now(), id, "a@mople.com", "이름",
                   Instant.now(), false, "USER"),
               USER_SEARCH_INDEX_TOPIC, UserSearchIndexEvent.class.getName()),
-          arguments(new ReviewCreatedEvent(UUID.randomUUID(), Instant.now(), id, 4.5),
-              REVIEW_CREATED_TOPIC, ReviewCreatedEvent.class.getName()),
-          arguments(new ReviewUpdatedEvent(UUID.randomUUID(), Instant.now(), id, 3.0, 4.5),
-              REVIEW_UPDATED_TOPIC, ReviewUpdatedEvent.class.getName()),
-          arguments(new ReviewDeletedEvent(UUID.randomUUID(), Instant.now(), id, 4.5),
-              REVIEW_DELETED_TOPIC, ReviewDeletedEvent.class.getName()),
           arguments(new DirectMessageCreatedEvent(UUID.randomUUID(), Instant.now(), id, id),
               DIRECT_MESSAGE_TOPIC, DirectMessageCreatedEvent.class.getName()),
           arguments(new NotificationCreatedEvent(UUID.randomUUID(), Instant.now(), id, id),

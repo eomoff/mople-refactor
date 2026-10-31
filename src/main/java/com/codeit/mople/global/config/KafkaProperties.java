@@ -19,9 +19,6 @@ public record KafkaProperties(
   public record Topics(
       @NotBlank String followCreated,
       @NotBlank String playlistContentAdded,
-      @NotBlank String reviewCreated,
-      @NotBlank String reviewUpdated,
-      @NotBlank String reviewDeleted,
       @NotBlank String directMessageCreated,
       @NotBlank String notificationCreated,
       @NotBlank String contentSearchIndex,

@@ -148,6 +148,11 @@ public class ReviewIntegrationTest {
       assertThat(savedReview.getAuthor().getId()).isEqualTo(savedAuthor.getId());
       assertThat(savedReview.getText()).isEqualTo(reviewText);
       assertThat(savedReview.getRating()).isEqualTo(reviewRating);
+
+      Content content = contentRepository.findById(savedContent.getId()).orElseThrow();
+
+      assertThat(content.getReviewCount()).isEqualTo(1);
+      assertThat(content.getRatingSum()).isEqualTo(reviewRating);
     }
 
     @Test
@@ -276,6 +281,11 @@ public class ReviewIntegrationTest {
 
       assertThat(updatedReview.getText()).isEqualTo(newText);
       assertThat(updatedReview.getRating()).isEqualTo(newRating);
+
+      Content content = contentRepository.findById(savedContent.getId()).orElseThrow();
+
+      assertThat(content.getReviewCount()).isEqualTo(1);
+      assertThat(content.getRatingSum()).isEqualTo(newRating);
     }
 
     @Test
@@ -346,6 +356,11 @@ public class ReviewIntegrationTest {
 
       // DB에 리뷰 검증(행이 하나도 없어야 함)
       assertThat(reviewRepository.findById(savedReview.getId())).isEmpty();
+
+      Content content = contentRepository.findById(savedContent.getId()).orElseThrow();
+
+      assertThat(content.getReviewCount()).isZero();
+      assertThat(content.getRatingSum()).isZero();
     }
 
     @Test
