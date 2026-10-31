@@ -1,11 +1,10 @@
 package com.codeit.mople.global.sse.event;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import com.codeit.mople.domain.directmessage.dto.response.DirectMessageDto;
 import com.codeit.mople.domain.directmessage.event.DirectMessageCreatedEvent;
@@ -53,12 +52,9 @@ public class SseEventConsumerTest {
   class DirectMessageCreated {
 
     @Test
-    @DisplayName("DM 생성 이벤트 성공")
+    @DisplayName("DM 생성 이벤트 성공 - 이 서버에 연결된 사용자에게 이벤트 ID로 전송")
     void handle_success() {
       // given
-
-      // BeforeEach에서 receiverId, directMessageId, directMessage를 초기화
-
       UUID eventId = UUID.randomUUID();
 
       DirectMessageCreatedEvent event =
@@ -66,49 +62,33 @@ public class SseEventConsumerTest {
 
       DirectMessageDto directMessageDto = mock(DirectMessageDto.class);
 
+      given(sseService.isConnected(receiverId)).willReturn(true);
       given(sseEventService.getDirectMessageDto(directMessageId))
           .willReturn(directMessageDto);
-
-      given(sseEventService.checkAndRecordProcessedEvent(eventId))
-          .willReturn(false);
 
       // when
       eventConsumer.handle(event);
 
       // then
-      verify(sseEventService).getDirectMessageDto(directMessageId);
-      verify(sseEventService).checkAndRecordProcessedEvent(eventId);
-      verify(sseService).send(eq(receiverId), eq("direct-messages"), any(DirectMessageDto.class));
+      verify(sseService).send(eventId, receiverId, "direct-messages", directMessageDto);
     }
 
     @Test
-    @DisplayName("DM 생성 이벤트 실패 - 이미 처리된 이벤트일 경우 SSE를 전송하지 않음")
-    void handle_fail_duplicate() {
+    @DisplayName("DM 생성 이벤트 무시 - 이 서버에 연결이 없으면 DM을 조회하지 않음")
+    void handle_ignore_notConnected() {
       // given
+      DirectMessageCreatedEvent event = new DirectMessageCreatedEvent(
+          UUID.randomUUID(), Instant.now(), receiverId, directMessageId);
 
-      // BeforeEach에서 receiverId, directMessageId, directMessage를 초기화
-
-      UUID eventId = UUID.randomUUID();
-
-      DirectMessageCreatedEvent event =
-          new DirectMessageCreatedEvent(eventId, Instant.now(), receiverId, directMessageId);
-
-      DirectMessageDto directMessageDto = mock(DirectMessageDto.class);
-
-      given(sseEventService.getDirectMessageDto(directMessageId))
-          .willReturn(directMessageDto);
-
-      given(sseEventService.checkAndRecordProcessedEvent(eventId))
-          .willReturn(true);
+      given(sseService.isConnected(receiverId)).willReturn(false);
 
       // when
       eventConsumer.handle(event);
 
       // then
-      verify(sseEventService).getDirectMessageDto(directMessageId);
-      verify(sseEventService).checkAndRecordProcessedEvent(eventId);
-
-      verifyNoInteractions(sseService);
+      verify(sseService).isConnected(receiverId);
+      verifyNoMoreInteractions(sseService);
+      verifyNoInteractions(sseEventService);
     }
 
   }
@@ -118,12 +98,9 @@ public class SseEventConsumerTest {
   class NotificationCreated {
 
     @Test
-    @DisplayName("알림 생성 이벤트 성공")
+    @DisplayName("알림 생성 이벤트 성공 - 이 서버에 연결된 사용자에게 이벤트 ID로 전송")
     void handle_success() {
       // given
-
-      // BeforeEach에서 receiverId, notificationId, notification를 초기화
-
       UUID eventId = UUID.randomUUID();
 
       NotificationCreatedEvent event =
@@ -131,49 +108,33 @@ public class SseEventConsumerTest {
 
       NotificationResponse notificationResponse = mock(NotificationResponse.class);
 
+      given(sseService.isConnected(receiverId)).willReturn(true);
       given(sseEventService.getNotificationResponse(notificationId))
           .willReturn(notificationResponse);
-
-      given(sseEventService.checkAndRecordProcessedEvent(eventId))
-          .willReturn(false);
 
       // when
       eventConsumer.handle(event);
 
       // then
-      verify(sseEventService).getNotificationResponse(notificationId);
-      verify(sseEventService).checkAndRecordProcessedEvent(eventId);
-      verify(sseService).send(eq(receiverId), eq("notifications"), any(NotificationResponse.class));
+      verify(sseService).send(eventId, receiverId, "notifications", notificationResponse);
     }
 
     @Test
-    @DisplayName("알림 생성 이벤트 실패 - 이미 처리된 이벤트일 경우 SSE를 전송하지 않음")
-    void handle_fail_duplicate() {
+    @DisplayName("알림 생성 이벤트 무시 - 이 서버에 연결이 없으면 알림을 조회하지 않음")
+    void handle_ignore_notConnected() {
       // given
+      NotificationCreatedEvent event = new NotificationCreatedEvent(
+          UUID.randomUUID(), Instant.now(), receiverId, notificationId);
 
-      // BeforeEach에서 receiverId, notificationId, notification를 초기화
-
-      UUID eventId = UUID.randomUUID();
-
-      NotificationCreatedEvent event =
-          new NotificationCreatedEvent(eventId, Instant.now(), receiverId, notificationId);
-
-      NotificationResponse notificationResponse = mock(NotificationResponse.class);
-
-      given(sseEventService.getNotificationResponse(notificationId))
-          .willReturn(notificationResponse);
-
-      given(sseEventService.checkAndRecordProcessedEvent(eventId))
-          .willReturn(true);
+      given(sseService.isConnected(receiverId)).willReturn(false);
 
       // when
       eventConsumer.handle(event);
 
       // then
-      verify(sseEventService).getNotificationResponse(notificationId);
-      verify(sseEventService).checkAndRecordProcessedEvent(eventId);
-
-      verifyNoInteractions(sseService);
+      verify(sseService).isConnected(receiverId);
+      verifyNoMoreInteractions(sseService);
+      verifyNoInteractions(sseEventService);
     }
 
   }

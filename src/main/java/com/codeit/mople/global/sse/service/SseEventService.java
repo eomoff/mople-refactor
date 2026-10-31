@@ -10,20 +10,15 @@ import com.codeit.mople.domain.notification.entity.Notification;
 import com.codeit.mople.domain.notification.exception.NotificationErrorCode;
 import com.codeit.mople.domain.notification.exception.NotificationException;
 import com.codeit.mople.domain.notification.repository.NotificationRepository;
-import com.codeit.mople.global.event.processed.ProcessedEventRepository;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SseEventService {
-
-  private final ProcessedEventRepository processedEventRepository;
 
   private final DirectMessageRepository directMessageRepository;
   private final NotificationRepository notificationRepository;
@@ -52,19 +47,6 @@ public class SseEventService {
         );
 
     return NotificationResponse.from(notification);
-  }
-
-  @Transactional
-  public boolean checkAndRecordProcessedEvent(UUID eventId) {
-    // 이미 해당 eventId가 존재하면 스킵
-    int inserted = processedEventRepository.insertIfAbsent(eventId);
-
-    if (inserted == 0) {
-      log.info("이미 처리된 이벤트입니다: eventId={}", eventId);
-      return true;
-    }
-
-    return false;
   }
 
 }

@@ -5,7 +5,9 @@ import com.codeit.mople.global.event.failure.ConsumeFailureMetricsListener;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.function.BiFunction;
+import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.TopicPartition;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -13,8 +15,10 @@ import org.springframework.boot.autoconfigure.kafka.DefaultKafkaConsumerFactoryC
 import org.springframework.boot.autoconfigure.kafka.DefaultKafkaProducerFactoryCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
+import org.springframework.kafka.core.KafkaAdmin;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
@@ -34,6 +38,7 @@ public class KafkaConfig {
 
   private static final String DLT_SUFFIX = ".dlt";
   private static final int ANY_PARTITION = -1;
+  private static final int TOPIC_PARTITIONS = 3;
 
   static final int FAILURE_QUEUE_CAPACITY = 1000;
 
@@ -115,5 +120,29 @@ public class KafkaConfig {
   public DefaultKafkaConsumerFactoryCustomizer jsonDeserializerCustomizer(ObjectMapper objectMapper) {
     return factory -> ((DefaultKafkaConsumerFactory<String, Object>)factory)
         .setValueDeserializerSupplier(() -> new ErrorHandlingDeserializer<>(new JsonDeserializer<>(objectMapper)));
+  }
+
+  @Bean
+  public KafkaAdmin.NewTopics kafkaTopics(KafkaProperties kafkaProperties) {
+    KafkaProperties.Topics topics = kafkaProperties.topics();
+
+    return new KafkaAdmin.NewTopics(Stream.of(
+            topics.followCreated(),
+            topics.playlistContentAdded(),
+            topics.reviewCreated(),
+            topics.reviewUpdated(),
+            topics.reviewDeleted(),
+            topics.directMessageCreated(),
+            topics.notificationCreated(),
+            topics.contentSearchIndex(),
+            topics.userSearchIndex(),
+            topics.playlistSearchIndex(),
+            topics.userAccountStatusChanged(),
+            topics.playlistSubscribed(),
+            topics.playlistCreated(),
+            topics.directMessageReceived(),
+            topics.reviewWritten())
+        .map(name -> TopicBuilder.name(name).partitions(TOPIC_PARTITIONS).build())
+        .toArray(NewTopic[]::new));
   }
 }

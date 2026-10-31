@@ -22,8 +22,15 @@ public class SseEventConsumer {
   private final SseService sseService;
   private final SseEventService sseEventService;
 
-  @KafkaListener(topics = "${spring.kafka.topics.direct-message-created}")
+  @KafkaListener(
+      topics = "${spring.kafka.topics.direct-message-created}",
+      groupId = "sse-${sse.server-id}",
+      properties = "auto.offset.reset=latest"
+  )
   public void handle(DirectMessageCreatedEvent event) {
+    if (!sseService.isConnected(event.receiverId())) {
+      return;
+    }
 
     log.debug("SSE 이벤트 전송 시도: receiverId={}, directMessageId={}",
         event.receiverId(), event.directMessageId());
@@ -31,12 +38,9 @@ public class SseEventConsumer {
     DirectMessageDto response =
         sseEventService.getDirectMessageDto(event.directMessageId());
 
-    if (sseEventService.checkAndRecordProcessedEvent(event.eventId())) {
-      return;
-    }
-
     // SSE 이벤트 전송
     sseService.send(
+        event.eventId(),
         event.receiverId(),
         "direct-messages",
         response
@@ -46,8 +50,15 @@ public class SseEventConsumer {
         event.receiverId(), event.directMessageId());
   }
 
-  @KafkaListener(topics = "${spring.kafka.topics.notification-created}")
+  @KafkaListener(
+      topics = "${spring.kafka.topics.notification-created}",
+      groupId = "sse-${sse.server-id}",
+      properties = "auto.offset.reset=latest"
+  )
   public void handle(NotificationCreatedEvent event) {
+    if (!sseService.isConnected(event.receiverId())) {
+      return;
+    }
 
     log.debug("SSE 이벤트 전송 시도: receiverId={}, notificationId={}",
         event.receiverId(), event.notificationId());
@@ -55,11 +66,8 @@ public class SseEventConsumer {
     NotificationResponse response =
         sseEventService.getNotificationResponse(event.notificationId());
 
-    if (sseEventService.checkAndRecordProcessedEvent(event.eventId())) {
-      return;
-    }
-
     sseService.send(
+        event.eventId(),
         event.receiverId(),
         "notifications",
         response

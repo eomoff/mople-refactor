@@ -22,13 +22,20 @@ import com.codeit.mople.domain.review.event.ReviewWrittenEvent;
 import com.codeit.mople.domain.user.admin.enums.ForceLogoutReason;
 import com.codeit.mople.domain.user.admin.event.UserAccountStatusChangedEvent;
 import com.codeit.mople.domain.user.event.UserSearchIndexEvent;
+import com.codeit.mople.global.config.KafkaProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.clients.admin.TopicDescription;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -49,6 +56,7 @@ import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.kafka.test.utils.KafkaTestUtils;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.util.ReflectionUtils;
 
 @SpringBootTest(properties = {
     "spring.kafka.enabled=true",
@@ -105,6 +113,9 @@ class KafkaPublishSmokeTest {
 
   @Autowired
   ObjectMapper objectMapper;
+
+  @Autowired
+  KafkaProperties kafkaProperties;
 
   private Consumer<String, String> consumerFor(String topic) {
     Map<String, Object> props =
@@ -355,6 +366,33 @@ class KafkaPublishSmokeTest {
             KafkaTestUtils.getRecords(consumer, Duration.ofSeconds(2));
 
         assertThat(records.count()).isZero();
+      }
+    }
+  }
+
+  @Nested
+  @DisplayName("토픽 파티션")
+  class TopicPartitions {
+
+    @Test
+    @DisplayName("파티션 1개로 먼저 만들어진 토픽까지 설정된 토픽이 모두 파티션 3개인지")
+    void configuredTopicsHaveThreePartitions() throws Exception {
+      // given
+      List<String> topics = Arrays.stream(KafkaProperties.Topics.class.getRecordComponents())
+          .map(component -> (String) ReflectionUtils.invokeMethod(
+              component.getAccessor(), kafkaProperties.topics()))
+          .toList();
+
+      try (AdminClient admin = AdminClient.create(Map.of(
+          AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, embeddedKafka.getBrokersAsString()))) {
+        // when
+        Map<String, TopicDescription> descriptions =
+            admin.describeTopics(topics).allTopicNames().get(10, TimeUnit.SECONDS);
+
+        // then
+        assertThat(descriptions).containsOnlyKeys(topics);
+        assertThat(descriptions.values())
+            .allSatisfy(description -> assertThat(description.partitions()).hasSize(3));
       }
     }
   }

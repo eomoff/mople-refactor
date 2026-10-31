@@ -19,7 +19,6 @@ import com.codeit.mople.domain.notification.exception.NotificationErrorCode;
 import com.codeit.mople.domain.notification.exception.NotificationException;
 import com.codeit.mople.domain.notification.repository.NotificationRepository;
 import com.codeit.mople.domain.user.entity.User;
-import com.codeit.mople.global.event.processed.ProcessedEventRepository;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,9 +35,6 @@ public class SseEventServiceTest {
 
   @Mock
   private SseService sseService;
-
-  @Mock
-  private ProcessedEventRepository processedEventRepository;
 
   @Mock
   private DirectMessageRepository directMessageRepository;
@@ -178,48 +174,6 @@ public class SseEventServiceTest {
           .isEqualTo(NotificationErrorCode.NOTIFICATION_NOT_FOUND);
 
       verify(notificationRepository).findById(notificationId);
-    }
-
-  }
-
-  @Nested
-  @DisplayName("이벤트 멱등성 처리")
-  class CheckAndRecordProcessedEvent {
-
-    @Test
-    @DisplayName("처리되지 않은 이벤트면 기록하고 false를 반환")
-    void checkAndRecordProcessedEvent_firstEvent() {
-      // given
-      UUID eventId = UUID.randomUUID();
-
-      given(processedEventRepository.insertIfAbsent(eventId))
-          .willReturn(1);
-
-      // when
-      boolean result = sseEventService.checkAndRecordProcessedEvent(eventId);
-
-      // then
-      assertThat(result).isFalse();
-
-      verify(processedEventRepository).insertIfAbsent(eventId);
-    }
-
-    @Test
-    @DisplayName("이미 처리된 이벤트면 기록하지 않고 true를 반환")
-    void checkAndRecordProcessedEvent_duplicateEvent() {
-      // given
-      UUID eventId = UUID.randomUUID();
-
-      given(processedEventRepository.insertIfAbsent(eventId))
-          .willReturn(0);
-
-      // when
-      boolean result = sseEventService.checkAndRecordProcessedEvent(eventId);
-
-      // then
-      assertThat(result).isTrue();
-
-      verify(processedEventRepository).insertIfAbsent(eventId);
     }
 
   }
