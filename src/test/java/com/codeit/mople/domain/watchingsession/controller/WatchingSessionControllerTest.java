@@ -3,13 +3,16 @@ package com.codeit.mople.domain.watchingsession.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.BDDMockito.given;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.codeit.mople.domain.auth.security.CustomUserDetails;
 import com.codeit.mople.domain.content.exception.ContentErrorCode;
 import com.codeit.mople.domain.content.exception.ContentException;
+import com.codeit.mople.domain.user.entity.Role;
 import com.codeit.mople.domain.watchingsession.dto.CursorResponseWatchingSessionDto;
 import com.codeit.mople.domain.watchingsession.dto.WatchingSessionContentDto;
 import com.codeit.mople.domain.watchingsession.dto.WatchingSessionResponse;
@@ -21,16 +24,15 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(WatchingSessionController.class)
-@WithMockUser
 class WatchingSessionControllerTest {
 
   @Autowired
@@ -44,6 +46,13 @@ class WatchingSessionControllerTest {
 
   @MockitoBean
   private DiscordWebhookService discordWebhookService;
+
+  private CustomUserDetails principal;
+
+  @BeforeEach
+  void setUp() {
+    principal = new CustomUserDetails(UUID.randomUUID(), Role.USER);
+  }
 
   @Test
   @DisplayName("특정 유저 시청 세션 조회 성공 - 200 OK (콘텐츠 정보 포함)")
@@ -62,7 +71,8 @@ class WatchingSessionControllerTest {
 
     given(watchingSessionService.getWatchingSessionForUser(watcherId)).willReturn(mockResponse);
 
-    mockMvc.perform(get("/api/users/{watcherId}/watching-sessions", watcherId))
+    mockMvc.perform(get("/api/users/{watcherId}/watching-sessions", watcherId)
+            .with(user(principal)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.id").value(sessionId.toString()))
         .andExpect(jsonPath("$.watcher.userId").value(watcherId.toString()))
@@ -77,7 +87,8 @@ class WatchingSessionControllerTest {
 
     given(watchingSessionService.getWatchingSessionForUser(watcherId)).willReturn(null);
 
-    mockMvc.perform(get("/api/users/{watcherId}/watching-sessions", watcherId))
+    mockMvc.perform(get("/api/users/{watcherId}/watching-sessions", watcherId)
+            .with(user(principal)))
         .andExpect(status().isOk())
         .andExpect(content().string(""));
   }
@@ -97,7 +108,8 @@ class WatchingSessionControllerTest {
     mockMvc.perform(get("/api/contents/{contentId}/watching-sessions", contentId)
             .param("limit", "10")
             .param("sortDirection", "ASCENDING")
-            .param("sortBy", "id"))
+            .param("sortBy", "id")
+            .with(user(principal)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.totalCount").value(0));
   }
@@ -112,7 +124,8 @@ class WatchingSessionControllerTest {
     )).willThrow(
         new ContentException(ContentErrorCode.CONTENT_NOT_FOUND, Map.of("contentId", contentId)));
 
-    mockMvc.perform(get("/api/contents/{contentId}/watching-sessions", contentId))
+    mockMvc.perform(get("/api/contents/{contentId}/watching-sessions", contentId)
+            .with(user(principal)))
         .andExpect(status().isNotFound());
   }
 
@@ -126,7 +139,8 @@ class WatchingSessionControllerTest {
     )).willThrow(new ContentException(ContentErrorCode.INVALID_PAGE_REQUEST, Map.of("limit", 0)));
 
     mockMvc.perform(get("/api/contents/{contentId}/watching-sessions", contentId)
-            .param("limit", "0"))
+            .param("limit", "0")
+            .with(user(principal)))
         .andExpect(status().isBadRequest());
   }
 }
