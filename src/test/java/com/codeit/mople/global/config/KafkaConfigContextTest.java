@@ -8,9 +8,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration;
 import org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
-import org.springframework.core.ResolvableType;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
 import org.springframework.kafka.listener.DefaultErrorHandler;
@@ -38,7 +38,8 @@ class KafkaConfigContextTest {
   }
 
   final ApplicationContextRunner runner = new ApplicationContextRunner()
-      .withConfiguration(AutoConfigurations.of(KafkaAutoConfiguration.class))
+      .withConfiguration(
+          AutoConfigurations.of(JacksonAutoConfiguration.class, KafkaAutoConfiguration.class))
       .withUserConfiguration(KafkaConfig.class)
       .withBean(KafkaProperties.class, KafkaConfigContextTest::kafkaProperties)
       .withBean(ConsumeFailureMetricsListener.class,
@@ -46,48 +47,26 @@ class KafkaConfigContextTest {
       .withPropertyValues(
           "spring.kafka.enabled=true",
           "spring.kafka.bootstrap-servers=" + BOOTSTRAP_SERVERS,
-          "spring.kafka.producer.key-serializer="
-              + "org.apache.kafka.common.serialization.StringSerializer",
-          "spring.kafka.producer.value-serializer="
-              + "org.springframework.kafka.support.serializer.JsonSerializer");
+          "spring.kafka.admin.auto-create=false");
 
   @Nested
   @DisplayName("템플릿 빈 구성")
   class Templates {
 
     @Test
-    @DisplayName("자동 설정 대신 우리 템플릿 두 개가 올라오는지")
-    void registersBothTemplates() {
+    @DisplayName("자동 설정 템플릿 하나와 우리 에러 핸들러가 올라오는지")
+    void registersSingleTemplateAndErrorHandler() {
       runner.run(context -> assertThat(context)
-          .hasBean("kafkaTemplate")
-          .hasBean("bytesKafkaTemplate")
+          .hasSingleBean(KafkaTemplate.class)
           .hasSingleBean(ProducerFactory.class)
           .hasSingleBean(DefaultErrorHandler.class));
     }
 
     @Test
-    @DisplayName("KafkaTemplate<String, Object> 주입이 bytes 템플릿과 안 섞이는지")
-    void objectTemplateResolvesUnambiguously() {
-      runner.run(context -> assertThat(context.getBeanNamesForType(
-          ResolvableType.forClassWithGenerics(KafkaTemplate.class, String.class, Object.class)))
-          .containsExactly("kafkaTemplate"));
-    }
-
-    @Test
-    @DisplayName("KafkaTemplate<String, byte[]> 주입이 일반 템플릿과 안 섞이는지")
-    void bytesTemplateResolvesUnambiguously() {
-      runner.run(context -> assertThat(context.getBeanNamesForType(
-          ResolvableType.forClassWithGenerics(KafkaTemplate.class, String.class, byte[].class)))
-          .containsExactly("bytesKafkaTemplate"));
-    }
-
-    @Test
-    @DisplayName("kafka.enabled 가 꺼져 있으면 자동 설정 템플릿으로 되돌아가는지")
-    void fallsBackToAutoConfigurationWhenDisabled() {
+    @DisplayName("kafka.enabled 가 꺼져 있으면 우리 에러 핸들러가 안 올라오는지")
+    void skipsErrorHandlerWhenDisabled() {
       runner.withPropertyValues("spring.kafka.enabled=false")
           .run(context -> assertThat(context)
-              .hasSingleBean(KafkaTemplate.class)
-              .doesNotHaveBean("bytesKafkaTemplate")
               .doesNotHaveBean(DefaultErrorHandler.class));
     }
   }
