@@ -1,6 +1,5 @@
 package com.codeit.mople.domain.watchingsession.controller;
 
-import com.codeit.mople.domain.auth.security.CustomUserDetails;
 import com.codeit.mople.domain.watchingsession.controller.api.WatchingSessionApi;
 import com.codeit.mople.domain.watchingsession.dto.CursorResponseWatchingSessionDto;
 import com.codeit.mople.domain.watchingsession.dto.WatchingSessionResponse;
@@ -8,7 +7,6 @@ import com.codeit.mople.domain.watchingsession.service.WatchingSessionService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -39,8 +37,7 @@ public class WatchingSessionController implements WatchingSessionApi {
       @RequestParam(value = "idAfter", required = false) UUID idAfter,
       @RequestParam(value = "limit", defaultValue = "10") int limit,
       @RequestParam(value = "sortDirection", defaultValue = "ASCENDING") String sortDirection,
-      @RequestParam(value = "sortBy", defaultValue = "id") String sortBy,
-      @AuthenticationPrincipal(errorOnInvalidType = true) CustomUserDetails userDetails) {
+      @RequestParam(value = "sortBy", defaultValue = "id") String sortBy) {
 
     //최신화된 시청자 목록을 조회하여 반환
     CursorResponseWatchingSessionDto response = watchingSessionService.getWatchingSessions(

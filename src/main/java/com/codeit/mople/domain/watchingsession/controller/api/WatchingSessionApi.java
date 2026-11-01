@@ -1,6 +1,5 @@
 package com.codeit.mople.domain.watchingsession.controller.api;
 
-import com.codeit.mople.domain.auth.security.CustomUserDetails;
 import com.codeit.mople.domain.watchingsession.dto.CursorResponseWatchingSessionDto;
 import com.codeit.mople.domain.watchingsession.dto.WatchingSessionResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -11,7 +10,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 
@@ -62,7 +60,6 @@ public interface WatchingSessionApi {
       @RequestParam(value = "idAfter", required = false) UUID idAfter,
       @RequestParam(value = "limit", defaultValue = "10") int limit,
       @RequestParam(value = "sortDirection", defaultValue = "ASCENDING") String sortDirection,
-      @RequestParam(value = "sortBy", defaultValue = "id") String sortBy,
-      @AuthenticationPrincipal CustomUserDetails userDetails
+      @RequestParam(value = "sortBy", defaultValue = "id") String sortBy
   );
 }
