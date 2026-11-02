@@ -19,96 +19,24 @@ concurrency:
 permissions:
   contents: read
 
-env:
-  AWS_REGION: ap-northeast-2
-  ECR_APP_REPOSITORY: mople-app-lb
-  ECS_CLUSTER: mople-nginx-cluster
-  APP_SERVICE: mople-app-lb-service
-  APP_TASK_DEF_FILE: ecs/task-def-app.json
-
 jobs:
-  build-and-push:
-    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main'
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: 저장소 체크아웃
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-          persist-credentials: false
-
-      - name: AWS 자격 증명 설정
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: ECR 로그인
-        id: ecr-login
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: app 이미지 빌드 및 푸시
-        env:
-          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
-          IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
-        run: |
-          docker build -t $REGISTRY/$ECR_APP_REPOSITORY:$IMAGE_TAG .
-          docker tag $REGISTRY/$ECR_APP_REPOSITORY:$IMAGE_TAG $REGISTRY/$ECR_APP_REPOSITORY:latest
-          docker push $REGISTRY/$ECR_APP_REPOSITORY:$IMAGE_TAG
-          docker push $REGISTRY/$ECR_APP_REPOSITORY:latest
-
   deploy:
-    needs: build-and-push
-    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main'
+    runs-on: self-hosted
+    defaults:
+      run:
+        working-directory: /opt/mople
 
     steps:
-      - name: 저장소 체크아웃
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-          persist-credentials: false
-
-      - name: AWS 자격 증명 설정
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: app 태스크 정의 렌더링 (ES_HOST_IP 주입)
-        id: render-app
+      - name: 배포할 커밋으로 이동
+        env:
+          SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
-          ES_HOST_IP=$(aws ssm get-parameter \
-            --name /mople/ES_HOST_IP \
-            --with-decryption \
-            --query 'Parameter.Value' \
-            --output text)
-          jq --arg ip "$ES_HOST_IP" \
-            '.containerDefinitions[0].extraHosts[0].ipAddress = $ip' \
-            ${{ env.APP_TASK_DEF_FILE }} > rendered-task-def-app.json
-          echo "rendered_file=rendered-task-def-app.json" >> "$GITHUB_OUTPUT"
+          git fetch origin main
+          git checkout --detach "$SHA"
 
-      - name: app 태스크 정의 등록
-        id: register-app
-        run: |
-          TASK_DEF_ARN=$(aws ecs register-task-definition \
-            --cli-input-json file://${{ steps.render-app.outputs.rendered_file }} \
-            --query 'taskDefinition.taskDefinitionArn' \
-            --output text)
-          echo "task_def_arn=$TASK_DEF_ARN" >> "$GITHUB_OUTPUT"
+      - name: app 이미지 빌드 및 컨테이너 교체
+        run: docker compose -f docker-compose.prod.yml up -d --build --wait --wait-timeout 300
 
-      - name: app 서비스 업데이트
-        run: |
-          aws ecs update-service \
-            --cluster ${{ env.ECS_CLUSTER }} \
-            --service ${{ env.APP_SERVICE }} \
-            --task-definition ${{ steps.register-app.outputs.task_def_arn }} \
-            --force-new-deployment
-
-      - name: app 배포 안정화 대기
-        run: |
-          aws ecs wait services-stable \
-            --cluster ${{ env.ECS_CLUSTER }} \
-            --services ${{ env.APP_SERVICE }}
+      - name: 이전 이미지 정리
+        run: docker image prune -f

@@ -48,6 +48,7 @@ out/
 ### 환경변수 ###
 .env
 .env.*
+!.env.prod.example
 !.env.example
 
 ### AI 도구 ###
