@@ -18,13 +18,16 @@ import com.codeit.mople.domain.conversation.repository.ConversationRepository;
 import com.codeit.mople.domain.directmessage.dto.request.DirectMessageCursorRequest;
 import com.codeit.mople.domain.directmessage.dto.response.DirectMessageDto;
 import com.codeit.mople.domain.directmessage.entity.DirectMessage;
+import com.codeit.mople.domain.directmessage.event.DirectMessageCreatedEvent;
 import com.codeit.mople.domain.directmessage.event.DirectMessageLastReadAtEvent;
 import com.codeit.mople.domain.directmessage.exception.DirectMessageErrorCode;
 import com.codeit.mople.domain.directmessage.exception.DirectMessageException;
 import com.codeit.mople.domain.directmessage.repository.DirectMessageReadRedisRepository;
 import com.codeit.mople.domain.directmessage.repository.DirectMessageRepository;
 import com.codeit.mople.domain.user.entity.User;
+import com.codeit.mople.global.config.KafkaProperties;
 import com.codeit.mople.global.dto.CursorResponse;
+import com.codeit.mople.global.outbox.OutboxService;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
@@ -37,6 +40,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import com.codeit.mople.domain.directmessage.event.DirectMessageReceivedEvent;
+import org.mockito.Answers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -45,6 +49,9 @@ import org.springframework.context.ApplicationEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 public class DirectMessageServiceTest {
+
+  private static final String DIRECT_MESSAGE_RECEIVED_TOPIC = "mople.direct-message.received.v1";
+  private static final String DIRECT_MESSAGE_CREATED_TOPIC = "mople.direct-message.created.v1";
 
   @InjectMocks
   private DirectMessageService directMessageService;
@@ -60,6 +67,12 @@ public class DirectMessageServiceTest {
 
   @Mock
   private DirectMessageReadRedisRepository readRedisRepository;
+
+  @Mock
+  private OutboxService outboxService;
+
+  @Mock(answer = Answers.RETURNS_DEEP_STUBS)
+  private KafkaProperties kafkaProperties;
 
   @Spy
   private MeterRegistry meterRegistry = new SimpleMeterRegistry();
@@ -124,6 +137,10 @@ public class DirectMessageServiceTest {
           .willReturn(Optional.of(conversation));
       given(directMessageRepository.save(any(DirectMessage.class)))
           .willReturn(mockSavedMessage);
+      given(kafkaProperties.topics().directMessageReceived())
+          .willReturn(DIRECT_MESSAGE_RECEIVED_TOPIC);
+      given(kafkaProperties.topics().directMessageCreated())
+          .willReturn(DIRECT_MESSAGE_CREATED_TOPIC);
 
       //when
       DirectMessageDto result = directMessageService.sendMessage(conversationId, userAId, content);
@@ -136,7 +153,11 @@ public class DirectMessageServiceTest {
       verify(conversation).updateLastMessage(mockSavedMessage);
 
       verify(publisher).publishEvent(any(DirectMessageLastReadAtEvent.class));
-      verify(publisher).publishEvent(any(DirectMessageReceivedEvent.class));
+      verify(publisher).publishEvent(any(DirectMessageCreatedEvent.class));
+      verify(outboxService).save(any(), eq(DIRECT_MESSAGE_RECEIVED_TOPIC), eq(userBId.toString()),
+          any(DirectMessageReceivedEvent.class));
+      verify(outboxService).save(any(), eq(DIRECT_MESSAGE_CREATED_TOPIC), eq(userBId.toString()),
+          any(DirectMessageCreatedEvent.class));
 
       verify(readRedisRepository, never()).saveLastReadAt(any(), any(), any());
       verify(conversation, never()).updateLastReadAt(eq(userAId), any());
@@ -154,7 +175,7 @@ public class DirectMessageServiceTest {
           .isInstanceOf(ConversationException.class)
           .hasMessageContaining(ConversationErrorCode.CONVERSATION_NOT_FOUND.getMessage());
 
-      verifyNoInteractions(publisher);
+      verifyNoInteractions(publisher, outboxService);
     }
 
     @Test
@@ -175,7 +196,7 @@ public class DirectMessageServiceTest {
           () -> directMessageService.sendMessage(conversationId, strangerId, "테스트 메시지"))
           .isInstanceOf(ConversationException.class);
 
-      verifyNoInteractions(publisher);
+      verifyNoInteractions(publisher, outboxService);
     }
   }
 

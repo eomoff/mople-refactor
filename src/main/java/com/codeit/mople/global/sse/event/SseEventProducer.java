@@ -7,42 +7,26 @@ import com.codeit.mople.global.sse.service.SseEventService;
 import com.codeit.mople.global.sse.service.SseService;
 import java.util.UUID;
 import java.util.function.Supplier;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 @ConditionalOnProperty(prefix = KafkaProperties.PREFIX, name = "enabled", havingValue = "true")
 public class SseEventProducer {
 
-  private final KafkaTemplate<String, Object> kafkaTemplate;
   private final SseService sseService;
   private final SseEventService sseEventService;
-
-  private final String directMessageTopic;
-
-  public SseEventProducer(
-      KafkaTemplate<String, Object> kafkaTemplate,
-      SseService sseService,
-      SseEventService sseEventService,
-      KafkaProperties properties
-  ) {
-    this.kafkaTemplate = kafkaTemplate;
-    this.sseService = sseService;
-    this.sseEventService = sseEventService;
-    this.directMessageTopic = properties.topics().directMessageCreated();
-  }
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void on(DirectMessageCreatedEvent event) {
     saveForResend(event.eventId(), event.receiverId(), "direct-messages",
         () -> sseEventService.getDirectMessageDto(event.directMessageId()));
-
-    kafkaTemplate.send(directMessageTopic, event.receiverId().toString(), event);
   }
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)

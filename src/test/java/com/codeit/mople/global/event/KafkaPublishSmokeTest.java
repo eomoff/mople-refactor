@@ -48,7 +48,6 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.test.EmbeddedKafkaBroker;
 import org.springframework.kafka.test.context.EmbeddedKafka;
@@ -95,9 +94,6 @@ class KafkaPublishSmokeTest {
   static final String REVIEW_WRITTEN_TOPIC = "mople.review.written.v1";
 
   static final String TYPE_ID_HEADER = "__TypeId__";
-
-  @Autowired
-  ApplicationEventPublisher eventPublisher;
 
   @Autowired
   TransactionTemplate transactionTemplate;
@@ -275,18 +271,6 @@ class KafkaPublishSmokeTest {
   @DisplayName("전체 발행 이벤트")
   class EveryPublishedEvent {
 
-    static Stream<Arguments> events() {
-      UUID id = UUID.randomUUID();
-
-      return Stream.of(
-          arguments(new DirectMessageCreatedEvent(UUID.randomUUID(), Instant.now(), id, id),
-              DIRECT_MESSAGE_TOPIC, DirectMessageCreatedEvent.class.getName()),
-          arguments(new DirectMessageReceivedEvent(UUID.randomUUID(), Instant.now(), id, id,
-                  "발신자", "안녕하세요"),
-              DIRECT_MESSAGE_RECEIVED_TOPIC, DirectMessageReceivedEvent.class.getName())
-      );
-    }
-
     static Stream<Arguments> outboxEvents() {
       UUID id = UUID.randomUUID();
 
@@ -315,25 +299,13 @@ class KafkaPublishSmokeTest {
               USER_SEARCH_INDEX_TOPIC, UserSearchIndexEvent.class.getName()),
           arguments(new UserAccountStatusChangedEvent(UUID.randomUUID(), Instant.now(), id,
                   ForceLogoutReason.ROLE_CHANGE, true),
-              USER_ACCOUNT_STATUS_CHANGED_TOPIC, UserAccountStatusChangedEvent.class.getName())
+              USER_ACCOUNT_STATUS_CHANGED_TOPIC, UserAccountStatusChangedEvent.class.getName()),
+          arguments(new DirectMessageCreatedEvent(UUID.randomUUID(), Instant.now(), id, id),
+              DIRECT_MESSAGE_TOPIC, DirectMessageCreatedEvent.class.getName()),
+          arguments(new DirectMessageReceivedEvent(UUID.randomUUID(), Instant.now(), id, id,
+                  "발신자", "안녕하세요"),
+              DIRECT_MESSAGE_RECEIVED_TOPIC, DirectMessageReceivedEvent.class.getName())
       );
-    }
-
-    @ParameterizedTest(name = "{2}")
-    @MethodSource("events")
-    @DisplayName("커밋 뒤 제 토픽으로 나가고 헤더에 제 클래스 이름이 실리는지")
-    void publishesWithClassName(Object event, String topic, String className) throws Exception {
-      try (Consumer<String, String> consumer = consumerFor(topic)) {
-        // when
-        transactionTemplate.executeWithoutResult(status -> eventPublisher.publishEvent(event));
-
-        // then
-        ConsumerRecord<String, String> record =
-            KafkaTestUtils.getSingleRecord(consumer, topic, Duration.ofSeconds(10));
-
-        assertThat(typeIdOf(record)).isEqualTo(className);
-        assertThat(record.value()).isEqualTo(objectMapper.writeValueAsString(event));
-      }
     }
 
     @ParameterizedTest(name = "{2}")

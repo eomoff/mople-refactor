@@ -15,7 +15,9 @@ import com.codeit.mople.domain.directmessage.exception.DirectMessageException;
 import com.codeit.mople.domain.directmessage.event.DirectMessageReceivedEvent;
 import com.codeit.mople.domain.directmessage.repository.DirectMessageRepository;
 import com.codeit.mople.domain.user.entity.User;
+import com.codeit.mople.global.config.KafkaProperties;
 import com.codeit.mople.global.dto.CursorResponse;
+import com.codeit.mople.global.outbox.OutboxService;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
@@ -40,6 +42,8 @@ public class DirectMessageService {
   private final ConversationRepository conversationRepository;
   private final ApplicationEventPublisher publisher;
   private final DirectMessageReadRedisRepository readRedisRepository;
+  private final OutboxService outboxService;
+  private final KafkaProperties kafkaProperties;
 
   private final MeterRegistry meterRegistry;
   private Counter dmSendCounter;
@@ -82,15 +86,19 @@ public class DirectMessageService {
     publisher.publishEvent(
         new DirectMessageLastReadAtEvent(conversationId, senderId, directMessage.getCreatedAt()));
 
-    publisher.publishEvent(
-        new DirectMessageReceivedEvent(UUID.randomUUID(), directMessage.getCreatedAt(),
-            directMessage.getId(), receiver.getId(), sender.getName(), content));
+    DirectMessageReceivedEvent receivedEvent = new DirectMessageReceivedEvent(UUID.randomUUID(),
+        directMessage.getCreatedAt(), directMessage.getId(), receiver.getId(), sender.getName(),
+        content);
+    outboxService.save(receivedEvent.eventId(), kafkaProperties.topics().directMessageReceived(),
+        receivedEvent.receiverId().toString(), receivedEvent);
 
     DirectMessageDto responseDto = DirectMessageDto.from(directMessage);
 
-    publisher.publishEvent(
-        new DirectMessageCreatedEvent(UUID.randomUUID(), directMessage.getCreatedAt(),
-            receiver.getId(), directMessage.getId()));
+    DirectMessageCreatedEvent createdEvent = new DirectMessageCreatedEvent(UUID.randomUUID(),
+        directMessage.getCreatedAt(), receiver.getId(), directMessage.getId());
+    outboxService.save(createdEvent.eventId(), kafkaProperties.topics().directMessageCreated(),
+        createdEvent.receiverId().toString(), createdEvent);
+    publisher.publishEvent(createdEvent);
 
     //발송 성공 시 카운트 증가
     dmSendCounter.increment();
