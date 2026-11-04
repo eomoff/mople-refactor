@@ -30,6 +30,7 @@ public class ReviewEventConsumer {
 
     followService.getFollowerIds(event.authorId())
         .forEach(followerId -> notificationCreator.createNotification(
+            event.eventId(),
             followerId,
             new NotificationTemplate(
                 event.authorName() + "님의 새로운 활동이 있습니다.",

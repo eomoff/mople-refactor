@@ -49,6 +49,7 @@ class FollowEventConsumerTest {
 
     // then
     verify(notificationCreator).createNotification(
+        eventId,
         followeeId,
         new NotificationTemplate(
             "새로운 팔로워가 생겼습니다.",

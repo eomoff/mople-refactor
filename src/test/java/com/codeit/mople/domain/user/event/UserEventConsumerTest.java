@@ -49,6 +49,7 @@ class UserEventConsumerTest {
 
     // then
     verify(notificationCreator).createNotification(
+        eventId,
         userId,
         new NotificationTemplate(
             "권한이 변경되었습니다.",
@@ -74,6 +75,7 @@ class UserEventConsumerTest {
 
     // then
     verify(notificationCreator, times(2)).createNotification(
+        eventId,
         userId,
         new NotificationTemplate(
             "권한이 변경되었습니다.",

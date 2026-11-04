@@ -31,29 +31,36 @@ public class NotificationCreator {
 
   @Transactional
   public void createNotification(
+      UUID eventId,
       UUID receiverId,
       NotificationTemplate template,
       NotificationType type,
       String targetKey
   ) {
-    log.debug("알림 생성 요청: receiverId={}, type={}", receiverId, type);
-    // 1. 요청 받은 수신자id가 실제 존재하는지 검증
+    log.debug("알림 생성 요청: eventId={}, receiverId={}, type={}", eventId, receiverId, type);
+    // 1. 이 수신자에게 이미 처리한 이벤트인지 검증
+    if (notificationRepository.existsByReceiverIdAndEventId(receiverId, eventId)) {
+      log.debug("이미 처리한 이벤트 생략: eventId={}, receiverId={}", eventId, receiverId);
+      return;
+    }
+
+    // 2. 요청 받은 수신자id가 실제 존재하는지 검증
     if (!userRepository.existsById(receiverId)) {
       throw new NotificationException(NotificationErrorCode.NOTIFICATION_USER_NOT_FOUND);
     }
 
-    // 2. 이미 생성된 알림이 존재하는지 검증
+    // 3. 이미 생성된 알림이 존재하는지 검증
     String hashId = Notification.hashIdOf(receiverId, type, targetKey);
     if (notificationRepository.existsByHashId(hashId)) {
       log.debug("중복 알림 생략: receiverId={}, type={}", receiverId, type);
       return;
     }
 
-    // 3. 알림 저장
-    Notification saved =
-        notificationRepository.save(Notification.create(receiverId, template, type, hashId));
+    // 4. 알림 저장
+    Notification saved = notificationRepository.save(
+        Notification.create(eventId, receiverId, template, type, hashId));
 
-    // 4. 이벤트 outbox 저장 및 발행
+    // 5. 이벤트 outbox 저장 및 발행
     NotificationCreatedEvent event = new NotificationCreatedEvent(
         UUID.randomUUID(), saved.getCreatedAt(), receiverId, saved.getId());
     outboxService.save(event.eventId(), kafkaProperties.topics().notificationCreated(),

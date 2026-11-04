@@ -66,6 +66,7 @@ class PlaylistContentAddedEventConsumerTest {
 
     // then
     verify(notificationCreator).createNotification(
+        eventId,
         subscriberA,
         new NotificationTemplate(
             "구독한 플레이리스트에 새 콘텐츠가 추가되었습니다.",
@@ -75,6 +76,7 @@ class PlaylistContentAddedEventConsumerTest {
         playlistContentId.toString()
     );
     verify(notificationCreator).createNotification(
+        eventId,
         subscriberB,
         new NotificationTemplate(
             "구독한 플레이리스트에 새 콘텐츠가 추가되었습니다.",
@@ -99,6 +101,7 @@ class PlaylistContentAddedEventConsumerTest {
         .willReturn(List.of(subscriberA, subscriberB));
     willThrow(failure)
         .given(notificationCreator).createNotification(
+            eventId,
             subscriberA,
             new NotificationTemplate(
                 "구독한 플레이리스트에 새 콘텐츠가 추가되었습니다.",

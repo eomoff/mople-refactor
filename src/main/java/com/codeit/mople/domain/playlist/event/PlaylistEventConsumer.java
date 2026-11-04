@@ -25,6 +25,7 @@ public class PlaylistEventConsumer {
   @KafkaListener(topics = "${spring.kafka.topics.playlist-subscribed}")
   public void handle(PlaylistSubscribedEvent event) {
     notificationCreator.createNotification(
+        event.eventId(),
         event.ownerId(),
         new NotificationTemplate(
             "플레이리스트에 새 구독자가 생겼습니다.",
@@ -42,6 +43,7 @@ public class PlaylistEventConsumer {
   public void handle(PlaylistCreatedEvent event) {
     followService.getFollowerIds(event.ownerId())
         .forEach(followerId -> notificationCreator.createNotification(
+            event.eventId(),
             followerId,
             new NotificationTemplate(
                 event.ownerName() + "님의 새로운 활동이 있습니다.",

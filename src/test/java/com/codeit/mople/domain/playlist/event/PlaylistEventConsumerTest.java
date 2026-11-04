@@ -61,6 +61,7 @@ class PlaylistEventConsumerTest {
 
       // then
       verify(notificationCreator).createNotification(
+          eventId,
           ownerId,
           new NotificationTemplate(
               "플레이리스트에 새 구독자가 생겼습니다.",
@@ -98,9 +99,9 @@ class PlaylistEventConsumerTest {
           "새 플레이리스트를 만들었습니다."
       );
       verify(notificationCreator).createNotification(
-          followerA, template, NotificationType.FOLLOWEE_ACTIVITY, playlistId.toString());
+          eventId, followerA, template, NotificationType.FOLLOWEE_ACTIVITY, playlistId.toString());
       verify(notificationCreator).createNotification(
-          followerB, template, NotificationType.FOLLOWEE_ACTIVITY, playlistId.toString());
+          eventId, followerB, template, NotificationType.FOLLOWEE_ACTIVITY, playlistId.toString());
       verifyNoMoreInteractions(notificationCreator);
     }
 

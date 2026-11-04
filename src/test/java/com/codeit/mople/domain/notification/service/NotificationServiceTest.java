@@ -350,8 +350,8 @@ class NotificationServiceTest {
   }
 
   private Notification createNotification(UUID receiverId) {
-    return Notification.create(receiverId, new NotificationTemplate("제목", "내용"),
-        NotificationType.FOLLOW_CREATED, "hashId");
+    return Notification.create(UUID.randomUUID(), receiverId,
+        new NotificationTemplate("제목", "내용"), NotificationType.FOLLOW_CREATED, "hashId");
   }
 
   private Notification mockNotification(UUID id, String title, String content,

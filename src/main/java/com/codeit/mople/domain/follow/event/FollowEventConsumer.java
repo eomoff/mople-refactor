@@ -23,6 +23,7 @@ public class FollowEventConsumer {
   @KafkaListener(topics = "${spring.kafka.topics.follow-created}")
   public void handle(FollowCreatedEvent event) {
     notificationCreator.createNotification(
+        event.eventId(),
         event.followeeId(),
         new NotificationTemplate(
             "새로운 팔로워가 생겼습니다.",

@@ -6,6 +6,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -20,10 +21,16 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 @Entity
-@Table(name = "notifications")
+@Table(name = "notifications",
+    uniqueConstraints = @UniqueConstraint(
+        name = "uk_notifications_receiver_event",
+        columnNames = {"receiver_id", "event_id"}))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Notification extends BaseEntity {
+
+  @Column
+  private UUID eventId;
 
   @Column(nullable = false)
   private UUID receiverId;
@@ -47,11 +54,13 @@ public class Notification extends BaseEntity {
   private Instant readAt;
 
   private Notification(
+      UUID eventId,
       UUID receiverId,
       NotificationTemplate template,
       NotificationType notificationType,
       String hashId
   ) {
+    this.eventId = Objects.requireNonNull(eventId, "eventId");
     this.receiverId = Objects.requireNonNull(receiverId, "receiverId");
     this.template = Objects.requireNonNull(template, "template");
     this.notificationType = Objects.requireNonNull(notificationType, "notificationType");
@@ -60,12 +69,13 @@ public class Notification extends BaseEntity {
   }
 
   public static Notification create(
+      UUID eventId,
       UUID receiverId,
       NotificationTemplate template,
       NotificationType notificationType,
       String hashId
   ) {
-    return new Notification(receiverId, template, notificationType, hashId);
+    return new Notification(eventId, receiverId, template, notificationType, hashId);
   }
 
   public void markAsRead() {

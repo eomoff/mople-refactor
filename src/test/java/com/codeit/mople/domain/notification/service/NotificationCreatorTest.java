@@ -53,12 +53,14 @@ class NotificationCreatorTest {
   @InjectMocks
   private NotificationCreator notificationCreator;
 
+  private UUID eventId;
   private UUID receiverId;
   private NotificationTemplate template;
   private String hashId;
 
   @BeforeEach
   void setUp() {
+    eventId = UUID.randomUUID();
     receiverId = UUID.randomUUID();
     template = new NotificationTemplate("새로운 메시지가 도착했습니다.", "발신자: 안녕하세요!");
     hashId = Notification.hashIdOf(receiverId, NotificationType.DIRECT_MESSAGE_RECEIVED, "dm-id");
@@ -92,6 +94,7 @@ class NotificationCreatorTest {
 
       // when
       notificationCreator.createNotification(
+          eventId,
           receiverId,
           template,
           NotificationType.DIRECT_MESSAGE_RECEIVED,
@@ -104,6 +107,7 @@ class NotificationCreatorTest {
           .save(notificationCaptor.capture());
 
       Notification notification = notificationCaptor.getValue();
+      assertThat(notification.getEventId()).isEqualTo(eventId);
       assertThat(notification.getReceiverId()).isEqualTo(receiverId);
       assertThat(notification.getTemplate()).isEqualTo(template);
       assertThat(notification.getNotificationType())
@@ -124,6 +128,32 @@ class NotificationCreatorTest {
     }
 
     @Test
+    @DisplayName("같은 수신자에게 이미 처리한 이벤트면 저장하지 않고 이벤트도 발행하지 않는다")
+    void createNotification_skipsSave_whenEventAlreadyProcessed() {
+      // given
+      given(notificationRepository.existsByReceiverIdAndEventId(receiverId, eventId))
+          .willReturn(true);
+
+      // when
+      notificationCreator.createNotification(
+          eventId,
+          receiverId,
+          template,
+          NotificationType.DIRECT_MESSAGE_RECEIVED,
+          "dm-id"
+      );
+
+      // then
+      verify(notificationRepository, never())
+          .save(any(Notification.class));
+
+      verify(eventPublisher, never())
+          .publishEvent(any(Object.class));
+
+      verifyNoInteractions(userRepository, outboxService);
+    }
+
+    @Test
     @DisplayName("같은 hashId의 알림이 이미 있으면 저장하지 않고 이벤트도 발행하지 않는다")
     void createNotification_skipsSave_whenHashIdExists() {
       // given
@@ -135,6 +165,7 @@ class NotificationCreatorTest {
 
       // when
       notificationCreator.createNotification(
+          eventId,
           receiverId,
           template,
           NotificationType.DIRECT_MESSAGE_RECEIVED,
@@ -160,6 +191,7 @@ class NotificationCreatorTest {
 
       // when & then
       assertThatThrownBy(() -> notificationCreator.createNotification(
+          eventId,
           receiverId,
           template,
           NotificationType.DIRECT_MESSAGE_RECEIVED,

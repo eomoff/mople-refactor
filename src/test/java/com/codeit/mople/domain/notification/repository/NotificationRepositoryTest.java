@@ -45,8 +45,13 @@ class NotificationRepositoryTest {
   }
 
   private Notification createNotification(UUID receiverId, String title, NotificationType type) {
-    return Notification.create(receiverId, new NotificationTemplate(title, "내용"), type,
-        UUID.randomUUID().toString());
+    return Notification.create(UUID.randomUUID(), receiverId,
+        new NotificationTemplate(title, "내용"), type, UUID.randomUUID().toString());
+  }
+
+  private Notification createNotification(UUID eventId, UUID receiverId, String hashId) {
+    return Notification.create(eventId, receiverId, new NotificationTemplate("제목", "내용"),
+        NotificationType.FOLLOWEE_ACTIVITY, hashId);
   }
 
   private Notification saveNotification(UUID receiverId, String title, NotificationType type) {
@@ -89,7 +94,8 @@ class NotificationRepositoryTest {
     @Test
     @DisplayName("저장 후 모든 필드와 createdAt이 조회된다")
     void save_success_allFieldsAndCreatedAtPersisted() {
-      Notification notification = Notification.create(receiverId,
+      UUID eventId = UUID.randomUUID();
+      Notification notification = Notification.create(eventId, receiverId,
           new NotificationTemplate("제목", "내용"), NotificationType.ROLE_CHANGED, "hashId");
 
       Notification saved = notificationRepository.save(notification);
@@ -98,6 +104,7 @@ class NotificationRepositoryTest {
 
       Notification found = entityManager.find(Notification.class, saved.getId());
       assertThat(found).isNotNull();
+      assertThat(found.getEventId()).isEqualTo(eventId);
       assertThat(found.getReceiverId()).isEqualTo(receiverId);
       assertThat(found.getTemplate()).isEqualTo(new NotificationTemplate("제목", "내용"));
       assertThat(found.getNotificationType()).isEqualTo(NotificationType.ROLE_CHANGED);
@@ -110,7 +117,7 @@ class NotificationRepositoryTest {
     @Test
     @DisplayName("템플릿의 content가 null이어도 DB에 저장된다")
     void save_success_whenContentIsNull() {
-      Notification notification = Notification.create(receiverId,
+      Notification notification = Notification.create(UUID.randomUUID(), receiverId,
           new NotificationTemplate("제목", null), NotificationType.FOLLOW_CREATED, "hashId");
 
       Notification saved = notificationRepository.save(notification);
@@ -125,18 +132,70 @@ class NotificationRepositoryTest {
     @Test
     @DisplayName("같은 hashId로 저장하면 unique 제약 위반 예외가 발생한다")
     void save_fail_whenHashIdDuplicated() {
-      entityManager.persist(Notification.create(receiverId, new NotificationTemplate("제목", "내용"),
-          NotificationType.FOLLOW_CREATED, "duplicatedHashId"));
+      entityManager.persist(createNotification(UUID.randomUUID(), receiverId, "duplicatedHashId"));
       entityManager.flush();
 
       assertThatThrownBy(
           () -> {
-            entityManager.persist(Notification.create(receiverId,
-                new NotificationTemplate("제목", "내용"), NotificationType.FOLLOW_CREATED,
-                "duplicatedHashId"));
+            entityManager.persist(
+                createNotification(UUID.randomUUID(), receiverId, "duplicatedHashId"));
             entityManager.flush();
           })
           .isInstanceOf(PersistenceException.class);
+    }
+
+    @Test
+    @DisplayName("같은 수신자에게 같은 eventId로 저장하면 unique 제약 위반 예외가 발생한다")
+    void save_fail_whenReceiverAndEventIdDuplicated() {
+      UUID eventId = UUID.randomUUID();
+      entityManager.persist(createNotification(eventId, receiverId, "hashId1"));
+      entityManager.flush();
+
+      assertThatThrownBy(
+          () -> {
+            entityManager.persist(createNotification(eventId, receiverId, "hashId2"));
+            entityManager.flush();
+          })
+          .isInstanceOf(PersistenceException.class);
+    }
+
+    @Test
+    @DisplayName("같은 eventId라도 수신자가 다르면 각각 저장된다")
+    void save_success_whenSameEventIdForOtherReceiver() {
+      UUID eventId = UUID.randomUUID();
+      entityManager.persist(createNotification(eventId, receiverId, "hashId1"));
+      entityManager.persist(createNotification(eventId, otherReceiverId, "hashId2"));
+      entityManager.flush();
+
+      assertThat(notificationRepository.existsByReceiverIdAndEventId(receiverId, eventId))
+          .isTrue();
+      assertThat(notificationRepository.existsByReceiverIdAndEventId(otherReceiverId, eventId))
+          .isTrue();
+    }
+  }
+
+  @Nested
+  @DisplayName("수신자별 이벤트 처리 여부 조회 [existsByReceiverIdAndEventId]")
+  class ExistsByReceiverIdAndEventId {
+
+    @Test
+    @DisplayName("같은 수신자에게 같은 eventId의 알림이 있으면 true를 반환한다.")
+    void exists_success_returnsTrueWhenExists() {
+      UUID eventId = UUID.randomUUID();
+      persistAndFind(createNotification(eventId, receiverId, "hashId"));
+
+      assertThat(notificationRepository.existsByReceiverIdAndEventId(receiverId, eventId))
+          .isTrue();
+    }
+
+    @Test
+    @DisplayName("같은 eventId라도 다른 수신자의 알림만 있으면 false를 반환한다.")
+    void exists_success_returnsFalseForOtherReceiver() {
+      UUID eventId = UUID.randomUUID();
+      persistAndFind(createNotification(eventId, otherReceiverId, "hashId"));
+
+      assertThat(notificationRepository.existsByReceiverIdAndEventId(receiverId, eventId))
+          .isFalse();
     }
   }
 

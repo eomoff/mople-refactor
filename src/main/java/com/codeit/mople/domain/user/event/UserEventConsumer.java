@@ -31,6 +31,7 @@ public class UserEventConsumer {
 
     // 권한 변경은 가리킬 대상이 없어서 변경될 때마다 알림을 만든다.
     notificationCreator.createNotification(
+        event.eventId(),
         event.userId(),
         new NotificationTemplate(
             "권한이 변경되었습니다.",

@@ -11,11 +11,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class NotificationTest {
 
+  private UUID eventId;
   private UUID receiverId;
   private NotificationTemplate template;
 
   @BeforeEach
   void setUp() {
+    eventId = UUID.randomUUID();
     receiverId = UUID.randomUUID();
     template = new NotificationTemplate("제목", "내용");
   }
@@ -23,9 +25,10 @@ class NotificationTest {
   @Test
   @DisplayName("Notification 생성 시 전달한 필드값이 저장되고 읽지 않은 상태로 시작한다")
   void create_success() {
-    Notification notification = Notification.create(receiverId, template,
+    Notification notification = Notification.create(eventId, receiverId, template,
         NotificationType.FOLLOW_CREATED, "hashId");
 
+    assertThat(notification.getEventId()).isEqualTo(eventId);
     assertThat(notification.getReceiverId()).isEqualTo(receiverId);
     assertThat(notification.getTemplate()).isEqualTo(template);
     assertThat(notification.getNotificationType()).isEqualTo(NotificationType.FOLLOW_CREATED);
@@ -36,7 +39,7 @@ class NotificationTest {
   @Test
   @DisplayName("템플릿의 content가 null이어도 Notification 생성에 성공한다")
   void create_success_withNullContent() {
-    Notification notification = Notification.create(receiverId,
+    Notification notification = Notification.create(eventId, receiverId,
         new NotificationTemplate("제목", null), NotificationType.FOLLOW_CREATED, "hashId");
 
     assertThat(notification.getTemplate().content()).isNull();
@@ -45,7 +48,7 @@ class NotificationTest {
   @Test
   @DisplayName("ROLE_CHANGED 타입은 level이 WARNING이다")
   void create_levelIsWarning_whenWarningType() {
-    Notification notification = Notification.create(receiverId, template,
+    Notification notification = Notification.create(eventId, receiverId, template,
         NotificationType.ROLE_CHANGED, "hashId");
 
     assertThat(notification.getLevel()).isEqualTo(NotificationLevel.WARNING);
@@ -59,7 +62,8 @@ class NotificationTest {
         continue;
       }
 
-      Notification notification = Notification.create(receiverId, template, type, "hashId");
+      Notification notification =
+          Notification.create(eventId, receiverId, template, type, "hashId");
 
       assertThat(notification.getLevel())
           .as("NotificationType=%s 일 때 level은 INFO여야 한다", type)
@@ -68,10 +72,19 @@ class NotificationTest {
   }
 
   @Test
+  @DisplayName("eventId가 null이면 예외가 발생한다")
+  void create_throwsException_whenEventIdIsNull() {
+    assertThatThrownBy(() -> Notification.create(
+        null, receiverId, template, NotificationType.FOLLOW_CREATED, "hashId"))
+        .isInstanceOf(NullPointerException.class)
+        .hasMessage("eventId");
+  }
+
+  @Test
   @DisplayName("receiverId가 null이면 예외가 발생한다")
   void create_throwsException_whenReceiverIdIsNull() {
-    assertThatThrownBy(
-        () -> Notification.create(null, template, NotificationType.FOLLOW_CREATED, "hashId"))
+    assertThatThrownBy(() -> Notification.create(
+        eventId, null, template, NotificationType.FOLLOW_CREATED, "hashId"))
         .isInstanceOf(NullPointerException.class)
         .hasMessage("receiverId");
   }
@@ -79,8 +92,8 @@ class NotificationTest {
   @Test
   @DisplayName("template이 null이면 예외가 발생한다")
   void create_throwsException_whenTemplateIsNull() {
-    assertThatThrownBy(
-        () -> Notification.create(receiverId, null, NotificationType.FOLLOW_CREATED, "hashId"))
+    assertThatThrownBy(() -> Notification.create(
+        eventId, receiverId, null, NotificationType.FOLLOW_CREATED, "hashId"))
         .isInstanceOf(NullPointerException.class)
         .hasMessage("template");
   }
@@ -96,7 +109,7 @@ class NotificationTest {
   @Test
   @DisplayName("notificationType이 null이면 예외가 발생한다")
   void create_throwsException_whenNotificationTypeIsNull() {
-    assertThatThrownBy(() -> Notification.create(receiverId, template, null, "hashId"))
+    assertThatThrownBy(() -> Notification.create(eventId, receiverId, template, null, "hashId"))
         .isInstanceOf(NullPointerException.class)
         .hasMessage("notificationType");
   }
@@ -104,8 +117,8 @@ class NotificationTest {
   @Test
   @DisplayName("hashId가 null이면 예외가 발생한다")
   void create_throwsException_whenHashIdIsNull() {
-    assertThatThrownBy(
-        () -> Notification.create(receiverId, template, NotificationType.FOLLOW_CREATED, null))
+    assertThatThrownBy(() -> Notification.create(
+        eventId, receiverId, template, NotificationType.FOLLOW_CREATED, null))
         .isInstanceOf(NullPointerException.class)
         .hasMessage("hashId");
   }
@@ -113,7 +126,7 @@ class NotificationTest {
   @Test
   @DisplayName("읽음 처리하면 readAt이 기록된다")
   void markAsRead_success() {
-    Notification notification = Notification.create(receiverId, template,
+    Notification notification = Notification.create(eventId, receiverId, template,
         NotificationType.FOLLOW_CREATED, "hashId");
 
     notification.markAsRead();
@@ -124,7 +137,7 @@ class NotificationTest {
   @Test
   @DisplayName("이미 읽은 알림을 다시 읽음 처리해도 처음 기록한 readAt이 유지된다")
   void markAsRead_keepsFirstReadAt_whenAlreadyRead() {
-    Notification notification = Notification.create(receiverId, template,
+    Notification notification = Notification.create(eventId, receiverId, template,
         NotificationType.FOLLOW_CREATED, "hashId");
     notification.markAsRead();
     Instant firstReadAt = notification.getReadAt();

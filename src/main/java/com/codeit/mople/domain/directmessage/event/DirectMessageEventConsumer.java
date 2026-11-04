@@ -23,6 +23,7 @@ public class DirectMessageEventConsumer {
   @KafkaListener(topics = "${spring.kafka.topics.direct-message-received}")
   public void handle(DirectMessageReceivedEvent event) {
     notificationCreator.createNotification(
+        event.eventId(),
         event.receiverId(),
         new NotificationTemplate(
             "새로운 메시지가 도착했습니다.",

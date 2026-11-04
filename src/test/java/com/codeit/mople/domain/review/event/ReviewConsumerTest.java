@@ -59,9 +59,9 @@ public class ReviewConsumerTest {
           "리뷰를 작성했습니다."
       );
       verify(notificationCreator).createNotification(
-          followerA, template, NotificationType.FOLLOWEE_ACTIVITY, reviewId.toString());
+          eventId, followerA, template, NotificationType.FOLLOWEE_ACTIVITY, reviewId.toString());
       verify(notificationCreator).createNotification(
-          followerB, template, NotificationType.FOLLOWEE_ACTIVITY, reviewId.toString());
+          eventId, followerB, template, NotificationType.FOLLOWEE_ACTIVITY, reviewId.toString());
       verifyNoMoreInteractions(notificationCreator);
     }
 

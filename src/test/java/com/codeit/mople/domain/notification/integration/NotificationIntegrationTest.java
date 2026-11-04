@@ -77,8 +77,9 @@ public class NotificationIntegrationTest {
   // 알림마다 1초씩 다른 명시적 timestamp로 덮어써 저장 시각의 정밀도 문제 방지
   private UUID createNotification(UUID receiverId, String title, NotificationType type) {
     alertCounter++;
-    Notification saved = notificationRepository.saveAndFlush(Notification.create(receiverId,
-        new NotificationTemplate(title, "내용"), type, UUID.randomUUID().toString()));
+    Notification saved = notificationRepository.saveAndFlush(Notification.create(
+        UUID.randomUUID(), receiverId, new NotificationTemplate(title, "내용"), type,
+        UUID.randomUUID().toString()));
     entityManager.createNativeQuery(
             "UPDATE notifications SET created_at = :createdAt WHERE id = :id")
         .setParameter("createdAt", Instant.EPOCH.plusSeconds(alertCounter))

@@ -27,6 +27,7 @@ public class PlaylistContentAddedEventConsumer {
   public void handle(PlaylistContentAddedEvent event) {
     playlistService.getSubscriberIds(event.playlistId())
         .forEach(subscriberId -> notificationCreator.createNotification(
+            event.eventId(),
             subscriberId,
             new NotificationTemplate(
                 "구독한 플레이리스트에 새 콘텐츠가 추가되었습니다.",

@@ -9,5 +9,7 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
 
   boolean existsByHashId(String hashId);
 
+  boolean existsByReceiverIdAndEventId(UUID receiverId, UUID eventId);
+
   long countByReceiverIdAndReadAtIsNull(UUID receiverId);
 }
