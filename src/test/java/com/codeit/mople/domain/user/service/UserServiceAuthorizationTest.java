@@ -26,6 +26,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @SpringBootTest
 public class UserServiceAuthorizationTest {
@@ -75,6 +76,7 @@ public class UserServiceAuthorizationTest {
   void updateProfile_allowedByPreAuthorize_whenAdmin() {
     UUID targetId = UUID.randomUUID();
     User user = User.createUser("admin-target@test.com", "encoded", "originalName");
+    ReflectionTestUtils.setField(user, "id", targetId);
     when(userRepository.findById(targetId)).thenReturn(Optional.of(user));
 
     setAuth(UUID.randomUUID(), Role.ADMIN);

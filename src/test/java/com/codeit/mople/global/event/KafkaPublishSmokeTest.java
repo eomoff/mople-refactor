@@ -279,15 +279,8 @@ class KafkaPublishSmokeTest {
       UUID id = UUID.randomUUID();
 
       return Stream.of(
-          arguments(
-              new UserSearchIndexEvent(UUID.randomUUID(), Instant.now(), id, "a@mople.com", "이름",
-                  Instant.now(), false, "USER"),
-              USER_SEARCH_INDEX_TOPIC, UserSearchIndexEvent.class.getName()),
           arguments(new DirectMessageCreatedEvent(UUID.randomUUID(), Instant.now(), id, id),
               DIRECT_MESSAGE_TOPIC, DirectMessageCreatedEvent.class.getName()),
-          arguments(new UserAccountStatusChangedEvent(UUID.randomUUID(), Instant.now(), id,
-                  ForceLogoutReason.ROLE_CHANGE, true),
-              USER_ACCOUNT_STATUS_CHANGED_TOPIC, UserAccountStatusChangedEvent.class.getName()),
           arguments(new DirectMessageReceivedEvent(UUID.randomUUID(), Instant.now(), id, id,
                   "발신자", "안녕하세요"),
               DIRECT_MESSAGE_RECEIVED_TOPIC, DirectMessageReceivedEvent.class.getName())
@@ -315,7 +308,14 @@ class KafkaPublishSmokeTest {
                   ContentType.MOVIE, 4.5, 10L, Instant.now()),
               CONTENT_SEARCH_INDEX_TOPIC, ContentSearchIndexEvent.class.getName()),
           arguments(new ContentSearchIndexDeleteEvent(UUID.randomUUID(), Instant.now(), id),
-              CONTENT_SEARCH_INDEX_TOPIC, ContentSearchIndexDeleteEvent.class.getName())
+              CONTENT_SEARCH_INDEX_TOPIC, ContentSearchIndexDeleteEvent.class.getName()),
+          arguments(
+              new UserSearchIndexEvent(UUID.randomUUID(), Instant.now(), id, "a@mople.com", "이름",
+                  Instant.now(), false, "USER"),
+              USER_SEARCH_INDEX_TOPIC, UserSearchIndexEvent.class.getName()),
+          arguments(new UserAccountStatusChangedEvent(UUID.randomUUID(), Instant.now(), id,
+                  ForceLogoutReason.ROLE_CHANGE, true),
+              USER_ACCOUNT_STATUS_CHANGED_TOPIC, UserAccountStatusChangedEvent.class.getName())
       );
     }
 

@@ -11,6 +11,8 @@ import com.codeit.mople.domain.user.exception.UserErrorCode;
 import com.codeit.mople.domain.user.repository.UserRepository;
 import com.codeit.mople.domain.user.exception.UserException;
 import com.codeit.mople.global.config.CacheNames;
+import com.codeit.mople.global.config.KafkaProperties;
+import com.codeit.mople.global.outbox.OutboxService;
 import com.codeit.mople.domain.user.admin.enums.ForceLogoutReason;
 import com.codeit.mople.domain.user.admin.event.UserAccountStatusChangedEvent;
 import java.time.Instant;
@@ -31,6 +33,8 @@ public class AdminService {
 
   private final UserRepository userRepository;
   private final ApplicationEventPublisher eventPublisher;
+  private final OutboxService outboxService;
+  private final KafkaProperties kafkaProperties;
   private final SessionTokenRepository sessionTokenRepository;
   private final RefreshTokenRepository refreshTokenRepository;
   private final AccountLockRepository accountLockRepository;
@@ -53,22 +57,25 @@ public class AdminService {
       user.changeRole(role);
       sessionTokenRepository.invalidate(userId);
       refreshTokenRepository.invalidate(userId);
-      eventPublisher.publishEvent(
-          new UserAccountStatusChangedEvent(UUID.randomUUID(), Instant.now(), userId,
-              ForceLogoutReason.ROLE_CHANGE, true));
+      UserAccountStatusChangedEvent statusEvent = new UserAccountStatusChangedEvent(
+          UUID.randomUUID(), Instant.now(), userId, ForceLogoutReason.ROLE_CHANGE, true);
+      outboxService.save(statusEvent.eventId(),
+          kafkaProperties.topics().userAccountStatusChanged(),
+          statusEvent.userId().toString(), statusEvent);
+      eventPublisher.publishEvent(statusEvent);
 
-      eventPublisher.publishEvent(
-          new UserSearchIndexEvent(
-              UUID.randomUUID(),
-              Instant.now(),
-              user.getId(),
-              user.getEmail(),
-              user.getName(),
-              user.getCreatedAt(),
-              user.isLocked(),
-              user.getRole().name()
-          )
+      UserSearchIndexEvent indexEvent = new UserSearchIndexEvent(
+          UUID.randomUUID(),
+          Instant.now(),
+          user.getId(),
+          user.getEmail(),
+          user.getName(),
+          user.getCreatedAt(),
+          user.isLocked(),
+          user.getRole().name()
       );
+      outboxService.save(indexEvent.eventId(), kafkaProperties.topics().userSearchIndex(),
+          indexEvent.userId().toString(), indexEvent);
     }
     log.info("권한 변경 완료 - userId: {}, role: {}", userId, role);
   }
@@ -101,22 +108,25 @@ public class AdminService {
       }
       ForceLogoutReason reason =
           locked ? ForceLogoutReason.ACCOUNT_LOCKED : ForceLogoutReason.ACCOUNT_UNLOCKED;
-      eventPublisher.publishEvent(
-          new UserAccountStatusChangedEvent(UUID.randomUUID(), Instant.now(), userId, reason,
-              locked));
+      UserAccountStatusChangedEvent statusEvent = new UserAccountStatusChangedEvent(
+          UUID.randomUUID(), Instant.now(), userId, reason, locked);
+      outboxService.save(statusEvent.eventId(),
+          kafkaProperties.topics().userAccountStatusChanged(),
+          statusEvent.userId().toString(), statusEvent);
+      eventPublisher.publishEvent(statusEvent);
 
-      eventPublisher.publishEvent(
-          new UserSearchIndexEvent(
-              UUID.randomUUID(),
-              Instant.now(),
-              user.getId(),
-              user.getEmail(),
-              user.getName(),
-              user.getCreatedAt(),
-              user.isLocked(),
-              user.getRole().name()
-          )
+      UserSearchIndexEvent indexEvent = new UserSearchIndexEvent(
+          UUID.randomUUID(),
+          Instant.now(),
+          user.getId(),
+          user.getEmail(),
+          user.getName(),
+          user.getCreatedAt(),
+          user.isLocked(),
+          user.getRole().name()
       );
+      outboxService.save(indexEvent.eventId(), kafkaProperties.topics().userSearchIndex(),
+          indexEvent.userId().toString(), indexEvent);
     }
     log.info("계정 잠금 변경 완료 - userId: {}, locked: {}", userId, locked);
   }

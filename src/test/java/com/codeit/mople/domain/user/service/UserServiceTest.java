@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -21,9 +22,11 @@ import com.codeit.mople.domain.user.exception.UserErrorCode;
 import com.codeit.mople.domain.user.exception.UserException;
 import com.codeit.mople.domain.user.repository.UserRepository;
 import com.codeit.mople.domain.user.repository.search.UserSearchRepository;
+import com.codeit.mople.global.config.KafkaProperties;
 import com.codeit.mople.global.dto.CursorResponse;
 import com.codeit.mople.global.dto.SearchResult;
 import com.codeit.mople.global.dto.SortDirection;
+import com.codeit.mople.global.outbox.OutboxService;
 import com.codeit.mople.global.storage.FileStorageService;
 import java.time.Instant;
 import java.util.List;
@@ -34,10 +37,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Answers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -46,6 +49,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 @ExtendWith(MockitoExtension.class)
 public class UserServiceTest {
+
+  private static final String USER_SEARCH_INDEX_TOPIC = "mople.user-search-index-events.v1";
 
   @Mock
   private UserRepository userRepository;
@@ -66,7 +71,10 @@ public class UserServiceTest {
   private UserSearchRepository searchRepository;
 
   @Mock
-  private ApplicationEventPublisher eventPublisher;
+  private OutboxService outboxService;
+
+  @Mock(answer = Answers.RETURNS_DEEP_STUBS)
+  private KafkaProperties kafkaProperties;
 
   @InjectMocks
   private UserService userService;
@@ -95,13 +103,17 @@ public class UserServiceTest {
     when(userRepository.existsByEmail(request.email())).thenReturn(false);
     when(passwordEncoder.encode(request.password())).thenReturn("encodedPw");
     when(userRepository.save(any(User.class))).thenReturn(user);
+    when(kafkaProperties.topics().userSearchIndex()).thenReturn(USER_SEARCH_INDEX_TOPIC);
 
     UserDto response = userService.signUp(request);
 
     assertThat(response.email()).isEqualTo("test@test.com");
 
     verify(userRepository).save(any(User.class));
-    verify(eventPublisher).publishEvent(
+    verify(outboxService).save(
+        any(),
+        eq(USER_SEARCH_INDEX_TOPIC),
+        eq(userId.toString()),
         argThat((UserSearchIndexEvent event) ->
             event.eventId() != null
                 && event.userId().equals(userId)
@@ -282,19 +294,29 @@ public class UserServiceTest {
   @DisplayName("이름만 변경")
   void updateProfile_success_nameOnly() {
     UUID userId = UUID.randomUUID();
+    ReflectionTestUtils.setField(user, "id", userId);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(kafkaProperties.topics().userSearchIndex()).thenReturn(USER_SEARCH_INDEX_TOPIC);
 
     UserUpdateRequest request = new UserUpdateRequest("newName");
 
     UserDto response = userService.updateProfile(userId, request, null);
 
     assertThat(response.name()).isEqualTo("newName");
+    verify(outboxService).save(
+        any(),
+        eq(USER_SEARCH_INDEX_TOPIC),
+        eq(userId.toString()),
+        argThat((UserSearchIndexEvent event) ->
+            event.userId().equals(userId) && event.name().equals("newName"))
+    );
   }
 
   @Test
   @DisplayName("이미지만 변경")
   void updateProfile_success_imageOnly() {
     UUID userId = UUID.randomUUID();
+    ReflectionTestUtils.setField(user, "id", userId);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(fileStorageService.upload(any())).thenReturn("https://placeholder.mople.com/test.jpg");
 
@@ -315,6 +337,7 @@ public class UserServiceTest {
 
     ReflectionTestUtils.setField(user, "profileImageUrl", "https://placeholder.mople.com/old.jpg");
 
+    ReflectionTestUtils.setField(user, "id", userId);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(fileStorageService.upload(any())).thenReturn("https://placeholder.mople.com/test.jpg");
 
@@ -693,6 +716,7 @@ public class UserServiceTest {
   @DisplayName("빈 MultipartFile이면 이미지 업로드를 수행하지 않음")
   void updateProfile_doesNotUpload_whenImageIsEmpty() {
     UUID userId = UUID.randomUUID();
+    ReflectionTestUtils.setField(user, "id", userId);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
 
     MockMultipartFile emptyImage = new MockMultipartFile(
@@ -722,6 +746,7 @@ public class UserServiceTest {
 
     ReflectionTestUtils.setField(user, "profileImageUrl", null);
 
+    ReflectionTestUtils.setField(user, "id", userId);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(fileStorageService.upload(any()))
         .thenReturn("https://placeholder.mople.com/new.jpg");

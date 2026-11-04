@@ -3,6 +3,7 @@ package com.codeit.mople.domain.user.admin.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
@@ -15,9 +16,12 @@ import com.codeit.mople.domain.auth.repository.SessionTokenRepository;
 import com.codeit.mople.domain.auth.security.CustomUserDetails;
 import com.codeit.mople.domain.user.entity.Role;
 import com.codeit.mople.domain.user.entity.User;
+import com.codeit.mople.domain.user.event.UserSearchIndexEvent;
 import com.codeit.mople.domain.user.exception.UserErrorCode;
 import com.codeit.mople.domain.user.repository.UserRepository;
+import com.codeit.mople.global.config.KafkaProperties;
 import com.codeit.mople.global.error.CustomException;
+import com.codeit.mople.global.outbox.OutboxService;
 import com.codeit.mople.domain.user.admin.enums.ForceLogoutReason;
 import com.codeit.mople.domain.user.admin.event.UserAccountStatusChangedEvent;
 import java.util.Optional;
@@ -28,6 +32,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Answers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
@@ -38,9 +43,14 @@ import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class AdminServiceTest {
+
+  private static final String USER_ACCOUNT_STATUS_CHANGED_TOPIC =
+      "mople.user.account-status-changed.v1";
+  private static final String USER_SEARCH_INDEX_TOPIC = "mople.user-search-index-events.v1";
 
   @InjectMocks
   private AdminService adminService;
@@ -50,6 +60,12 @@ class AdminServiceTest {
 
   @Mock
   private ApplicationEventPublisher eventPublisher;
+
+  @Mock
+  private OutboxService outboxService;
+
+  @Mock(answer = Answers.RETURNS_DEEP_STUBS)
+  private KafkaProperties kafkaProperties;
 
   @Mock
   private SessionTokenRepository sessionTokenRepository;
@@ -72,6 +88,7 @@ class AdminServiceTest {
     userId = UUID.randomUUID();
     adminId = UUID.randomUUID();
     user = User.createUser("test@test.com", "encoded", "테스터");
+    ReflectionTestUtils.setField(user, "id", userId);
 
     CustomUserDetails principal = new CustomUserDetails(adminId, Role.ADMIN);
     Authentication auth = new UsernamePasswordAuthenticationToken(
@@ -93,6 +110,9 @@ class AdminServiceTest {
     void USER을_ADMIN으로_권한_변경_할_수_있고_강제_로그아웃_이벤트를_발행한다() {
       // given
       given(userRepository.findById(userId)).willReturn(Optional.of(user));
+      given(kafkaProperties.topics().userAccountStatusChanged())
+          .willReturn(USER_ACCOUNT_STATUS_CHANGED_TOPIC);
+      given(kafkaProperties.topics().userSearchIndex()).willReturn(USER_SEARCH_INDEX_TOPIC);
 
       // when
       adminService.changeUserRole(userId, "ADMIN");
@@ -105,6 +125,16 @@ class AdminServiceTest {
       verify(refreshTokenRepository).invalidate(userId);
       assertThat(eventCaptor.getValue().reason()).isEqualTo(ForceLogoutReason.ROLE_CHANGE);
       assertThat(eventCaptor.getValue().sessionInvalidated()).isTrue();
+
+      UserAccountStatusChangedEvent statusEvent = eventCaptor.getValue();
+      verify(outboxService).save(statusEvent.eventId(), USER_ACCOUNT_STATUS_CHANGED_TOPIC,
+          userId.toString(), statusEvent);
+
+      ArgumentCaptor<UserSearchIndexEvent> indexCaptor =
+          ArgumentCaptor.forClass(UserSearchIndexEvent.class);
+      verify(outboxService).save(any(), eq(USER_SEARCH_INDEX_TOPIC), eq(userId.toString()),
+          indexCaptor.capture());
+      assertThat(indexCaptor.getValue().role()).isEqualTo("ADMIN");
     }
 
     @Test
@@ -112,6 +142,7 @@ class AdminServiceTest {
     void ADMIN을_USER로_강등할_수_있고_강제_로그아웃_이벤트를_발행한다() {
       // given
       User admin = User.createAdmin("admin@test.com", "encoded", "어드민");
+      ReflectionTestUtils.setField(admin, "id", userId);
       given(userRepository.findById(userId)).willReturn(Optional.of(admin));
 
       // when
@@ -139,6 +170,7 @@ class AdminServiceTest {
       // then
       assertThat(user.getRole()).isEqualTo(Role.USER);
       verify(eventPublisher, never()).publishEvent(any());
+      verifyNoInteractions(outboxService);
       verify(sessionTokenRepository, never()).invalidate(any());
     }
 
@@ -155,6 +187,7 @@ class AdminServiceTest {
           .isEqualTo(UserErrorCode.USER_NOT_FOUND);
 
       verify(eventPublisher, never()).publishEvent(any());
+      verifyNoInteractions(outboxService);
     }
 
     @Test
@@ -165,6 +198,7 @@ class AdminServiceTest {
           .isThrownBy(() -> adminService.changeUserRole(userId, "INVALID_ROLE"));
 
       verify(eventPublisher, never()).publishEvent(any());
+      verifyNoInteractions(outboxService);
     }
 
     @Test
@@ -176,6 +210,7 @@ class AdminServiceTest {
           .isEqualTo(UserErrorCode.CANNOT_MODIFY_SELF);
 
       verify(eventPublisher, never()).publishEvent(any());
+      verifyNoInteractions(outboxService);
     }
   }
 
@@ -188,6 +223,9 @@ class AdminServiceTest {
     void locked_true이면_계정을_잠금하고_세션을_무효화하며_강제_로그아웃_이벤트를_발행한다() {
       // given
       given(userRepository.findById(userId)).willReturn(Optional.of(user));
+      given(kafkaProperties.topics().userAccountStatusChanged())
+          .willReturn(USER_ACCOUNT_STATUS_CHANGED_TOPIC);
+      given(kafkaProperties.topics().userSearchIndex()).willReturn(USER_SEARCH_INDEX_TOPIC);
 
       // when
       adminService.changeUserLocked(userId, true);
@@ -201,6 +239,16 @@ class AdminServiceTest {
       assertThat(eventCaptor.getValue().userId()).isEqualTo(userId);
       assertThat(eventCaptor.getValue().reason()).isEqualTo(ForceLogoutReason.ACCOUNT_LOCKED);
       assertThat(eventCaptor.getValue().sessionInvalidated()).isTrue();
+
+      UserAccountStatusChangedEvent statusEvent = eventCaptor.getValue();
+      verify(outboxService).save(statusEvent.eventId(), USER_ACCOUNT_STATUS_CHANGED_TOPIC,
+          userId.toString(), statusEvent);
+
+      ArgumentCaptor<UserSearchIndexEvent> indexCaptor =
+          ArgumentCaptor.forClass(UserSearchIndexEvent.class);
+      verify(outboxService).save(any(), eq(USER_SEARCH_INDEX_TOPIC), eq(userId.toString()),
+          indexCaptor.capture());
+      assertThat(indexCaptor.getValue().locked()).isTrue();
     }
 
     @Test
@@ -237,6 +285,7 @@ class AdminServiceTest {
           .isThrownBy(() -> adminService.changeUserLocked(userId, true));
 
       verify(eventPublisher, never()).publishEvent(any());
+      verifyNoInteractions(outboxService);
     }
 
     @Test
@@ -252,6 +301,7 @@ class AdminServiceTest {
       // then
       assertThat(user.isLocked()).isTrue();
       verify(eventPublisher, never()).publishEvent(any());
+      verifyNoInteractions(outboxService);
       verifyNoInteractions(accountLockRepository);
     }
 
@@ -267,6 +317,7 @@ class AdminServiceTest {
       // then
       assertThat(user.isLocked()).isFalse();
       verify(eventPublisher, never()).publishEvent(any());
+      verifyNoInteractions(outboxService);
       verifyNoInteractions(accountLockRepository);
     }
 
@@ -283,6 +334,7 @@ class AdminServiceTest {
           .isEqualTo(UserErrorCode.USER_NOT_FOUND);
 
       verify(eventPublisher, never()).publishEvent(any());
+      verifyNoInteractions(outboxService);
     }
 
     @Test
@@ -294,6 +346,7 @@ class AdminServiceTest {
           .isEqualTo(UserErrorCode.CANNOT_MODIFY_SELF);
 
       verify(eventPublisher, never()).publishEvent(any());
+      verifyNoInteractions(outboxService);
     }
   }
 }

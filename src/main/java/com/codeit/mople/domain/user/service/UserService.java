@@ -15,9 +15,11 @@ import com.codeit.mople.domain.user.exception.UserException;
 import com.codeit.mople.domain.user.repository.UserRepository;
 import com.codeit.mople.domain.user.repository.search.UserSearchRepository;
 import com.codeit.mople.global.config.CacheNames;
+import com.codeit.mople.global.config.KafkaProperties;
 import com.codeit.mople.global.dto.CursorResponse;
 import com.codeit.mople.global.dto.SearchResult;
 import com.codeit.mople.global.dto.SortDirection;
+import com.codeit.mople.global.outbox.OutboxService;
 import com.codeit.mople.global.storage.FileStorageService;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
@@ -32,7 +34,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -53,7 +54,8 @@ public class UserService {
   private final RefreshTokenRepository refreshTokenRepository;
   private final UserSearchRepository searchRepository;
 
-  private final ApplicationEventPublisher eventPublisher;
+  private final OutboxService outboxService;
+  private final KafkaProperties kafkaProperties;
 
   @CacheEvict(value = CacheNames.USER_LIST, allEntries = true)
   @Transactional
@@ -66,18 +68,18 @@ public class UserService {
     User user = User.createUser(normalizedEmail, encodedPassword, request.name());
     User saved = userRepository.save(user);
 
-    eventPublisher.publishEvent(
-        new UserSearchIndexEvent(
-            UUID.randomUUID(),
-            saved.getCreatedAt(),
-            saved.getId(),
-            saved.getEmail(),
-            saved.getName(),
-            saved.getCreatedAt(),
-            saved.isLocked(),
-            saved.getRole().name()
-        )
+    UserSearchIndexEvent event = new UserSearchIndexEvent(
+        UUID.randomUUID(),
+        saved.getCreatedAt(),
+        saved.getId(),
+        saved.getEmail(),
+        saved.getName(),
+        saved.getCreatedAt(),
+        saved.isLocked(),
+        saved.getRole().name()
     );
+    outboxService.save(event.eventId(), kafkaProperties.topics().userSearchIndex(),
+        event.userId().toString(), event);
 
     return UserDto.from(saved);
   }
@@ -208,18 +210,18 @@ public class UserService {
 
     user.updateProfile(request.name(), imageUrl);
 
-    eventPublisher.publishEvent(
-        new UserSearchIndexEvent(
-            UUID.randomUUID(),
-            Instant.now(),
-            user.getId(),
-            user.getEmail(),
-            user.getName(),
-            user.getCreatedAt(),
-            user.isLocked(),
-            user.getRole().name()
-        )
+    UserSearchIndexEvent event = new UserSearchIndexEvent(
+        UUID.randomUUID(),
+        Instant.now(),
+        user.getId(),
+        user.getEmail(),
+        user.getName(),
+        user.getCreatedAt(),
+        user.isLocked(),
+        user.getRole().name()
     );
+    outboxService.save(event.eventId(), kafkaProperties.topics().userSearchIndex(),
+        event.userId().toString(), event);
 
     return UserDto.from(user);
   }
