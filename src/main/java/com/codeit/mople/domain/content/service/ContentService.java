@@ -15,8 +15,10 @@ import com.codeit.mople.domain.content.repository.ContentQueryRepository;
 import com.codeit.mople.domain.content.repository.ContentRepository;
 import com.codeit.mople.domain.content.repository.search.ContentSearchRepository;
 import com.codeit.mople.global.config.CacheNames;
+import com.codeit.mople.global.config.KafkaProperties;
 import com.codeit.mople.global.dto.CursorResponse;
 import com.codeit.mople.global.dto.SearchResult;
+import com.codeit.mople.global.outbox.OutboxService;
 import com.codeit.mople.global.storage.FileStorageService;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -33,7 +35,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -49,7 +50,8 @@ public class ContentService {
   private final FileStorageService fileStorageService;
   private final ContentSearchRepository searchRepository;
 
-  private final ApplicationEventPublisher eventPublisher;
+  private final OutboxService outboxService;
+  private final KafkaProperties kafkaProperties;
 
   private final Counter contentCreateCounter;
   private final Counter contentGetCounter;
@@ -60,13 +62,15 @@ public class ContentService {
       ContentQueryRepository contentQueryRepository,
       FileStorageService fileStorageService,
       ContentSearchRepository searchRepository,
-      ApplicationEventPublisher eventPublisher,
+      OutboxService outboxService,
+      KafkaProperties kafkaProperties,
       MeterRegistry meterRegistry) {
     this.contentRepository = contentRepository;
     this.contentQueryRepository = contentQueryRepository;
     this.fileStorageService = fileStorageService;
     this.searchRepository = searchRepository;
-    this.eventPublisher = eventPublisher;
+    this.outboxService = outboxService;
+    this.kafkaProperties = kafkaProperties;
 
     this.contentCreateCounter = Counter.builder("mople.content.create.count")
         .description("콘텐츠 생성 성공 횟수")
@@ -119,18 +123,18 @@ public class ContentService {
 
     log.info("콘텐츠 생성 완료 - contentId: {}, title: {}", savedContent.getId(), savedContent.getTitle());
 
-    eventPublisher.publishEvent(
-        new ContentSearchIndexEvent(
-            UUID.randomUUID(),
-            savedContent.getCreatedAt(),
-            savedContent.getId(),
-            savedContent.getTitle(),
-            savedContent.getType(),
-            savedContent.calculateAverageRating(),
-            savedContent.getWatcherCount(),
-            savedContent.getCreatedAt()
-        )
+    ContentSearchIndexEvent event = new ContentSearchIndexEvent(
+        UUID.randomUUID(),
+        savedContent.getCreatedAt(),
+        savedContent.getId(),
+        savedContent.getTitle(),
+        savedContent.getType(),
+        savedContent.calculateAverageRating(),
+        savedContent.getWatcherCount(),
+        savedContent.getCreatedAt()
     );
+    outboxService.save(event.eventId(), kafkaProperties.topics().contentSearchIndex(),
+        event.contentId().toString(), event);
 
     return new ContentResponse(
         savedContent.getId(),
@@ -360,18 +364,18 @@ public class ContentService {
 
     log.info("콘텐츠 수정 완료 - contentId: {}", content.getId());
 
-    eventPublisher.publishEvent(
-        new ContentSearchIndexEvent(
-            UUID.randomUUID(),
-            Instant.now(),
-            content.getId(),
-            content.getTitle(),
-            content.getType(),
-            content.calculateAverageRating(),
-            content.getWatcherCount(),
-            content.getCreatedAt()
-        )
+    ContentSearchIndexEvent event = new ContentSearchIndexEvent(
+        UUID.randomUUID(),
+        Instant.now(),
+        content.getId(),
+        content.getTitle(),
+        content.getType(),
+        content.calculateAverageRating(),
+        content.getWatcherCount(),
+        content.getCreatedAt()
     );
+    outboxService.save(event.eventId(), kafkaProperties.topics().contentSearchIndex(),
+        event.contentId().toString(), event);
 
     return new ContentResponse(
         content.getId(),
@@ -421,8 +425,10 @@ public class ContentService {
 
     log.info("콘텐츠 삭제 완료 - contentId: {}", contentId);
 
-    eventPublisher.publishEvent(
-        new ContentSearchIndexDeleteEvent(UUID.randomUUID(), Instant.now(), contentId));
+    ContentSearchIndexDeleteEvent event =
+        new ContentSearchIndexDeleteEvent(UUID.randomUUID(), Instant.now(), contentId);
+    outboxService.save(event.eventId(), kafkaProperties.topics().contentSearchIndex(),
+        event.contentId().toString(), event);
   }
 
   //썸네일 검증 및 파일 시스템 저장 메서드

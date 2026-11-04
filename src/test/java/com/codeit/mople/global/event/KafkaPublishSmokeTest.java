@@ -279,11 +279,6 @@ class KafkaPublishSmokeTest {
       UUID id = UUID.randomUUID();
 
       return Stream.of(
-          arguments(new ContentSearchIndexEvent(UUID.randomUUID(), Instant.now(), id, "콘텐츠",
-                  ContentType.MOVIE, 4.5, 10L, Instant.now()),
-              CONTENT_SEARCH_INDEX_TOPIC, ContentSearchIndexEvent.class.getName()),
-          arguments(new ContentSearchIndexDeleteEvent(UUID.randomUUID(), Instant.now(), id),
-              CONTENT_SEARCH_INDEX_TOPIC, ContentSearchIndexDeleteEvent.class.getName()),
           arguments(
               new UserSearchIndexEvent(UUID.randomUUID(), Instant.now(), id, "a@mople.com", "이름",
                   Instant.now(), false, "USER"),
@@ -315,7 +310,12 @@ class KafkaPublishSmokeTest {
               PLAYLIST_SUBSCRIBED_TOPIC, PlaylistSubscribedEvent.class.getName()),
           arguments(new PlaylistCreatedEvent(UUID.randomUUID(), Instant.now(), id, id, "주인",
                   "플리"),
-              PLAYLIST_CREATED_TOPIC, PlaylistCreatedEvent.class.getName())
+              PLAYLIST_CREATED_TOPIC, PlaylistCreatedEvent.class.getName()),
+          arguments(new ContentSearchIndexEvent(UUID.randomUUID(), Instant.now(), id, "콘텐츠",
+                  ContentType.MOVIE, 4.5, 10L, Instant.now()),
+              CONTENT_SEARCH_INDEX_TOPIC, ContentSearchIndexEvent.class.getName()),
+          arguments(new ContentSearchIndexDeleteEvent(UUID.randomUUID(), Instant.now(), id),
+              CONTENT_SEARCH_INDEX_TOPIC, ContentSearchIndexDeleteEvent.class.getName())
       );
     }
 

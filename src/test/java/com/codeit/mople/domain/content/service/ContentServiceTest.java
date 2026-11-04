@@ -22,6 +22,8 @@ import com.codeit.mople.domain.content.exception.ContentException;
 import com.codeit.mople.domain.content.repository.ContentQueryRepository;
 import com.codeit.mople.domain.content.repository.ContentRepository;
 import com.codeit.mople.domain.content.repository.search.ContentSearchRepository;
+import com.codeit.mople.global.config.KafkaProperties;
+import com.codeit.mople.global.outbox.OutboxService;
 import com.codeit.mople.global.storage.FileStorageService;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -35,11 +37,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Answers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -47,6 +49,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 @ExtendWith(MockitoExtension.class)
 public class ContentServiceTest {
+
+  private static final String CONTENT_SEARCH_INDEX_TOPIC = "mople.content-search-index-events.v1";
 
   @Mock
   private ContentRepository contentRepository;
@@ -63,7 +67,10 @@ public class ContentServiceTest {
   private ContentSearchRepository searchRepository;
 
   @Mock
-  private ApplicationEventPublisher eventPublisher;
+  private OutboxService outboxService;
+
+  @Mock(answer = Answers.RETURNS_DEEP_STUBS)
+  private KafkaProperties kafkaProperties;
 
   @InjectMocks
   private ContentService contentService;
@@ -100,6 +107,7 @@ public class ContentServiceTest {
 
     given(fileStorageService.upload(any())).willReturn("/uploads/test.png");
     given(contentRepository.save(any(Content.class))).willReturn(savedContent);
+    given(kafkaProperties.topics().contentSearchIndex()).willReturn(CONTENT_SEARCH_INDEX_TOPIC);
 
     ContentResponse response = contentService.createContent(request, thumbnail);
 
@@ -107,7 +115,10 @@ public class ContentServiceTest {
     assertThat(response.title()).isEqualTo("테스트 영화");
     verify(fileStorageService).upload(any()); //업로드 호출 검증
     verify(contentRepository).save(any(Content.class));
-    verify(eventPublisher).publishEvent(
+    verify(outboxService).save(
+        any(),
+        eq(CONTENT_SEARCH_INDEX_TOPIC),
+        eq(savedContent.getId().toString()),
         argThat((ContentSearchIndexEvent event) ->
             event.eventId() != null
                 && event.contentId().equals(savedContent.getId())
@@ -302,6 +313,7 @@ public class ContentServiceTest {
     given(contentRepository.findById(any(UUID.class))).willReturn(Optional.of(content));
     given(fileStorageService.upload(any())).willReturn("/uploads/update.png");
 
+    given(kafkaProperties.topics().contentSearchIndex()).willReturn(CONTENT_SEARCH_INDEX_TOPIC);
     ContentResponse response = contentService.updateContent(contentId, request, thumbnail);
 
     assertThat(response).isNotNull();
@@ -314,7 +326,10 @@ public class ContentServiceTest {
     //S3 삭제 및 업로드 메서드가 호출되었는지 검증
     verify(fileStorageService).delete("/uploads/old.png");
     verify(fileStorageService).upload(thumbnail);
-    verify(eventPublisher).publishEvent(
+    verify(outboxService).save(
+        any(),
+        eq(CONTENT_SEARCH_INDEX_TOPIC),
+        eq(contentId.toString()),
         argThat((ContentSearchIndexEvent event) ->
             event.eventId() != null
                 && event.contentId().equals(content.getId())
@@ -336,11 +351,15 @@ public class ContentServiceTest {
     given(contentRepository.findById(any(UUID.class))).willReturn(Optional.of(content));
 
     //thumbnail 파라미터에 null을 전달
+    given(kafkaProperties.topics().contentSearchIndex()).willReturn(CONTENT_SEARCH_INDEX_TOPIC);
     ContentResponse response = contentService.updateContent(contentId, request, null);
 
     assertThat(response).isNotNull();
     assertThat(response.thumbnailUrl()).isEqualTo("/uploads/old.png"); //기존 URL이 그대로 유지되는지 검증
-    verify(eventPublisher).publishEvent(
+    verify(outboxService).save(
+        any(),
+        eq(CONTENT_SEARCH_INDEX_TOPIC),
+        eq(contentId.toString()),
         argThat((ContentSearchIndexEvent event) ->
             event.eventId() != null
                 && event.contentId().equals(content.getId())
@@ -381,6 +400,7 @@ public class ContentServiceTest {
 
     given(contentRepository.findById(any(UUID.class))).willReturn(Optional.of(content));
 
+    given(kafkaProperties.topics().contentSearchIndex()).willReturn(CONTENT_SEARCH_INDEX_TOPIC);
     contentService.deleteContent(contentId);
 
     //트랜잭션 커밋 이벤트 강제 트리거
@@ -390,7 +410,10 @@ public class ContentServiceTest {
     //S3 삭제 및 엔티티 삭제 메서드가 호출되었는지 검증
     verify(fileStorageService).delete("/uploads/delete.png");
     verify(contentRepository).delete(content);
-    verify(eventPublisher).publishEvent(
+    verify(outboxService).save(
+        any(),
+        eq(CONTENT_SEARCH_INDEX_TOPIC),
+        eq(contentId.toString()),
         argThat((ContentSearchIndexDeleteEvent event) ->
             event.eventId() != null
                 && event.contentId().equals(contentId)
