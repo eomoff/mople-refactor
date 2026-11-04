@@ -20,6 +20,8 @@ import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.exception.UserErrorCode;
 import com.codeit.mople.domain.user.exception.UserException;
 import com.codeit.mople.domain.user.repository.UserRepository;
+import com.codeit.mople.global.config.KafkaProperties;
+import com.codeit.mople.global.outbox.OutboxService;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
@@ -29,7 +31,6 @@ import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,7 +44,8 @@ public class ReviewService {
   private final UserRepository userRepository;
   private final ContentRepository contentRepository;
 
-  private final ApplicationEventPublisher eventPublisher;
+  private final OutboxService outboxService;
+  private final KafkaProperties kafkaProperties;
 
   private final MeterRegistry meterRegistry;
   private Counter reviewCreateCounter;
@@ -87,13 +89,15 @@ public class ReviewService {
 
     Review savedReview = reviewRepository.save(review);
 
-    eventPublisher.publishEvent(new ReviewWrittenEvent(
+    ReviewWrittenEvent event = new ReviewWrittenEvent(
         UUID.randomUUID(),
         savedReview.getCreatedAt(),
         savedReview.getId(),
         authorId,
         author.getName()
-    ));
+    );
+    outboxService.save(event.eventId(), kafkaProperties.topics().reviewWritten(),
+        event.eventId().toString(), event);
 
     contentRepository.increaseRating(content.getId(), savedReview.getRating());
 

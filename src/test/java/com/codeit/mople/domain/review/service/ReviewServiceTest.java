@@ -3,7 +3,6 @@ package com.codeit.mople.domain.review.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -32,8 +31,10 @@ import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.exception.UserErrorCode;
 import com.codeit.mople.domain.user.exception.UserException;
 import com.codeit.mople.domain.user.repository.UserRepository;
+import com.codeit.mople.global.config.KafkaProperties;
 import com.codeit.mople.global.dto.SortDirection;
 import com.codeit.mople.global.dto.UserSummary;
+import com.codeit.mople.global.outbox.OutboxService;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
@@ -45,11 +46,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Answers;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -67,7 +69,10 @@ public class ReviewServiceTest {
   private ContentRepository contentRepository;
 
   @Mock
-  private ApplicationEventPublisher eventPublisher;
+  private OutboxService outboxService;
+
+  @Mock(answer = Answers.RETURNS_DEEP_STUBS)
+  private KafkaProperties kafkaProperties;
 
   @Spy
   private MeterRegistry meterRegistry = new SimpleMeterRegistry();
@@ -165,6 +170,9 @@ public class ReviewServiceTest {
       given(reviewRepository.save(any(Review.class)))
           .willReturn(review);
 
+      given(kafkaProperties.topics().reviewWritten())
+          .willReturn("mople.review.written.v1");
+
       // when
       ReviewResponse result = reviewService.create(authorId, createRequest);
 
@@ -176,16 +184,19 @@ public class ReviewServiceTest {
       verify(contentRepository).findById(contentId);
       verify(reviewRepository).save(any(Review.class));
 
-      verify(eventPublisher).publishEvent(
-          argThat((Object event) ->
-              event instanceof ReviewWrittenEvent writtenEvent
-                  && writtenEvent.eventId() != null
-                  && writtenEvent.reviewId().equals(reviewId)
-                  && writtenEvent.authorId().equals(authorId)
-                  && writtenEvent.authorName().equals("test")
-          )
-      );
-      verifyNoMoreInteractions(eventPublisher);
+      ArgumentCaptor<ReviewWrittenEvent> eventCaptor =
+          ArgumentCaptor.forClass(ReviewWrittenEvent.class);
+      verify(outboxService).save(any(), any(), any(), eventCaptor.capture());
+
+      ReviewWrittenEvent writtenEvent = eventCaptor.getValue();
+      assertThat(writtenEvent.eventId()).isNotNull();
+      assertThat(writtenEvent.reviewId()).isEqualTo(reviewId);
+      assertThat(writtenEvent.authorId()).isEqualTo(authorId);
+      assertThat(writtenEvent.authorName()).isEqualTo("test");
+
+      verify(outboxService).save(writtenEvent.eventId(), "mople.review.written.v1",
+          writtenEvent.eventId().toString(), writtenEvent);
+      verifyNoMoreInteractions(outboxService);
 
       verify(contentRepository).increaseRating(contentId, reviewRating);
     }
@@ -524,7 +535,7 @@ public class ReviewServiceTest {
       verify(reviewRepository).findById(review1Id);
 
       verify(contentRepository).updateRating(contentId, 5.0, 3.0);
-      verifyNoInteractions(eventPublisher);
+      verifyNoInteractions(outboxService);
     }
 
     @Test
@@ -594,7 +605,7 @@ public class ReviewServiceTest {
       assertThat(result.text()).isEqualTo(updateRequest.text());
       assertThat(result.rating()).isEqualTo(updateRequest.rating());
       verify(contentRepository).updateRating(contentId, reviewRating, updateRequest.rating());
-      verifyNoInteractions(eventPublisher);
+      verifyNoInteractions(outboxService);
     }
   }
 
@@ -627,7 +638,7 @@ public class ReviewServiceTest {
       verify(reviewRepository).delete(review1);
 
       verify(contentRepository).decreaseRating(contentId, reviewRating);
-      verifyNoInteractions(eventPublisher);
+      verifyNoInteractions(outboxService);
     }
 
     @Test
@@ -696,7 +707,7 @@ public class ReviewServiceTest {
       // then
       verify(reviewRepository).delete(review1);
       verify(contentRepository).decreaseRating(contentId, reviewRating);
-      verifyNoInteractions(eventPublisher);
+      verifyNoInteractions(outboxService);
     }
   }
 

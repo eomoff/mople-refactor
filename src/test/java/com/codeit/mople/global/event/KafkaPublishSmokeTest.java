@@ -308,7 +308,14 @@ class KafkaPublishSmokeTest {
               PLAYLIST_CREATED_TOPIC, PlaylistCreatedEvent.class.getName()),
           arguments(new DirectMessageReceivedEvent(UUID.randomUUID(), Instant.now(), id, id,
                   "발신자", "안녕하세요"),
-              DIRECT_MESSAGE_RECEIVED_TOPIC, DirectMessageReceivedEvent.class.getName()),
+              DIRECT_MESSAGE_RECEIVED_TOPIC, DirectMessageReceivedEvent.class.getName())
+      );
+    }
+
+    static Stream<Arguments> outboxEvents() {
+      UUID id = UUID.randomUUID();
+
+      return Stream.of(
           arguments(new ReviewWrittenEvent(UUID.randomUUID(), Instant.now(), id, id, "작성자"),
               REVIEW_WRITTEN_TOPIC, ReviewWrittenEvent.class.getName())
       );
@@ -328,6 +335,27 @@ class KafkaPublishSmokeTest {
 
         assertThat(typeIdOf(record)).isEqualTo(className);
         assertThat(record.value()).isEqualTo(objectMapper.writeValueAsString(event));
+      }
+    }
+
+    @ParameterizedTest(name = "{2}")
+    @MethodSource("outboxEvents")
+    @DisplayName("outbox에 저장하면 relay가 제 토픽으로 보내고 원래 JSON과 클래스 이름, eventId 헤더가 실리는지")
+    void relaysWithClassName(Object event, String topic, String className) throws Exception {
+      // given
+      UUID eventId = (UUID) event.getClass().getMethod("eventId").invoke(event);
+
+      try (Consumer<String, String> consumer = consumerFor(topic)) {
+        // when
+        saveToOutbox(eventId, topic, eventId.toString(), event);
+
+        // then
+        ConsumerRecord<String, String> record =
+            KafkaTestUtils.getSingleRecord(consumer, topic, Duration.ofSeconds(10));
+
+        assertThat(typeIdOf(record)).isEqualTo(className);
+        assertThat(record.value()).isEqualTo(objectMapper.writeValueAsString(event));
+        assertThat(headerOf(record, OutboxRelay.EVENT_ID_HEADER)).isEqualTo(eventId.toString());
       }
     }
   }
