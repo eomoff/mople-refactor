@@ -47,7 +47,7 @@ public class SseEventProducer {
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void on(NotificationCreatedEvent event) {
-    saveForResend(event.eventId(), event.receiverId(), "notifications",
+    saveForResend(event.notificationId(), event.receiverId(), "notifications",
         () -> sseEventService.getNotificationResponse(event.notificationId()));
   }
 

@@ -67,7 +67,7 @@ public class SseEventConsumer {
         sseEventService.getNotificationResponse(event.notificationId());
 
     sseService.send(
-        event.eventId(),
+        event.notificationId(),
         event.receiverId(),
         "notifications",
         response

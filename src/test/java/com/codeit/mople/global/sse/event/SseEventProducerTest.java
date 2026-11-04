@@ -93,7 +93,7 @@ class SseEventProducerTest {
   }
 
   @Test
-  @DisplayName("알림 생성 이벤트는 재전송용으로만 저장하고 Kafka로 보내지 않는지")
+  @DisplayName("알림 생성 이벤트는 알림 ID로 재전송용 저장만 하고 Kafka로 보내지 않는지")
   void savesNotificationForResendWithoutPublishing() {
     // given
     UUID notificationId = UUID.randomUUID();
@@ -109,7 +109,7 @@ class SseEventProducerTest {
 
     // then
     verify(sseService).saveForResend(
-        event.eventId(), receiverId, "notifications", notificationResponse);
+        notificationId, receiverId, "notifications", notificationResponse);
     verifyNoInteractions(kafkaTemplate);
   }
 

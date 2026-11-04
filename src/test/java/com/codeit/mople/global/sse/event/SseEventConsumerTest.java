@@ -98,13 +98,11 @@ public class SseEventConsumerTest {
   class NotificationCreated {
 
     @Test
-    @DisplayName("알림 생성 이벤트 성공 - 이 서버에 연결된 사용자에게 이벤트 ID로 전송")
+    @DisplayName("알림 생성 이벤트 성공 - 이 서버에 연결된 사용자에게 알림 ID로 전송")
     void handle_success() {
       // given
-      UUID eventId = UUID.randomUUID();
-
-      NotificationCreatedEvent event =
-          new NotificationCreatedEvent(eventId, Instant.now(), receiverId, notificationId);
+      NotificationCreatedEvent event = new NotificationCreatedEvent(
+          UUID.randomUUID(), Instant.now(), receiverId, notificationId);
 
       NotificationResponse notificationResponse = mock(NotificationResponse.class);
 
@@ -116,7 +114,7 @@ public class SseEventConsumerTest {
       eventConsumer.handle(event);
 
       // then
-      verify(sseService).send(eventId, receiverId, "notifications", notificationResponse);
+      verify(sseService).send(notificationId, receiverId, "notifications", notificationResponse);
     }
 
     @Test
