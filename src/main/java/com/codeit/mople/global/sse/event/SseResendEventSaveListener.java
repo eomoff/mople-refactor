@@ -18,7 +18,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty(prefix = KafkaProperties.PREFIX, name = "enabled", havingValue = "true")
-public class SseEventProducer {
+public class SseResendEventSaveListener {
 
   private final SseService sseService;
   private final SseEventService sseEventService;

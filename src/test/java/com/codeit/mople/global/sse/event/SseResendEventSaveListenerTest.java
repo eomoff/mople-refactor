@@ -25,7 +25,7 @@ import org.springframework.data.redis.RedisConnectionFailureException;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("SSE 재전송용 이벤트 저장 테스트")
-class SseEventProducerTest {
+class SseResendEventSaveListenerTest {
 
   @Mock
   SseService sseService;
@@ -33,13 +33,13 @@ class SseEventProducerTest {
   @Mock
   SseEventService sseEventService;
 
-  SseEventProducer producer;
+  SseResendEventSaveListener listener;
 
   UUID receiverId;
 
   @BeforeEach
   void setUp() {
-    producer = new SseEventProducer(sseService, sseEventService);
+    listener = new SseResendEventSaveListener(sseService, sseEventService);
 
     receiverId = UUID.randomUUID();
   }
@@ -56,7 +56,7 @@ class SseEventProducerTest {
     given(sseEventService.getDirectMessageDto(directMessageId)).willReturn(directMessageDto);
 
     // when
-    producer.on(event);
+    listener.on(event);
 
     // then
     verify(sseService).saveForResend(
@@ -76,7 +76,7 @@ class SseEventProducerTest {
         .willReturn(notificationResponse);
 
     // when
-    producer.on(event);
+    listener.on(event);
 
     // then
     verify(sseService).saveForResend(
@@ -94,6 +94,6 @@ class SseEventProducerTest {
         .given(sseService).saveForResend(any(), any(), any(), any());
 
     // when & then
-    assertThatCode(() -> producer.on(event)).doesNotThrowAnyException();
+    assertThatCode(() -> listener.on(event)).doesNotThrowAnyException();
   }
 }
