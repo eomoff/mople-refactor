@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -38,9 +39,11 @@ import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.exception.UserErrorCode;
 import com.codeit.mople.domain.user.exception.UserException;
 import com.codeit.mople.domain.user.repository.UserRepository;
+import com.codeit.mople.global.config.KafkaProperties;
 import com.codeit.mople.global.dto.CursorResponse;
 import com.codeit.mople.global.dto.SortDirection;
 import com.codeit.mople.global.dto.UserSummary;
+import com.codeit.mople.global.outbox.OutboxService;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
@@ -52,13 +55,13 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Answers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -80,7 +83,10 @@ public class PlaylistServiceTest {
   private PlaylistSubscriptionRepository playlistSubscriptionRepository;
 
   @Mock
-  private ApplicationEventPublisher eventPublisher;
+  private OutboxService outboxService;
+
+  @Mock(answer = Answers.RETURNS_DEEP_STUBS)
+  private KafkaProperties kafkaProperties;
 
   @Mock
   private PlaylistSearchRepository searchRepository;
@@ -143,6 +149,12 @@ public class PlaylistServiceTest {
       // setUp()에서 owner, ownerId, title, description, createRequest 초기화
 
       Playlist playlist = Playlist.create(owner, title, description);
+      ReflectionTestUtils.setField(playlist, "id", playlistId);
+
+      given(kafkaProperties.topics().playlistCreated())
+          .willReturn("mople.playlist.created.v1");
+      given(kafkaProperties.topics().playlistSearchIndex())
+          .willReturn("mople.playlist-search-index-events.v1");
 
       given(owner.getId())
           .willReturn(ownerId);
@@ -183,11 +195,11 @@ public class PlaylistServiceTest {
       verify(userRepository).findById(ownerId);
       verify(playlistRepository).save(any(Playlist.class));
 
-      // publishEvent 동시에 검증 시 ClassCastException 발생하여 assert로 값 검증
+      // outbox 저장 동시에 검증 시 ClassCastException 발생하여 assert로 값 검증
       ArgumentCaptor<PlaylistCreatedEvent> createdCaptor =
           ArgumentCaptor.forClass(PlaylistCreatedEvent.class);
 
-      verify(eventPublisher).publishEvent(createdCaptor.capture());
+      verify(outboxService).save(any(), any(), any(), createdCaptor.capture());
 
       PlaylistCreatedEvent createdEvent = createdCaptor.getValue();
 
@@ -197,16 +209,22 @@ public class PlaylistServiceTest {
       assertThat(createdEvent.ownerName()).isEqualTo("test");
       assertThat(createdEvent.playlistTitle()).isEqualTo(title);
 
+      verify(outboxService).save(createdEvent.eventId(), "mople.playlist.created.v1",
+          playlistId.toString(), createdEvent);
+
       ArgumentCaptor<PlaylistSearchIndexEvent> captor =
           ArgumentCaptor.forClass(PlaylistSearchIndexEvent.class);
 
-      verify(eventPublisher).publishEvent(captor.capture());
+      verify(outboxService).save(any(), any(), any(), captor.capture());
 
       PlaylistSearchIndexEvent event = captor.getValue();
 
       assertThat(event.eventId()).isNotNull();
       assertThat(event.playlistId()).isEqualTo(playlist.getId());
       assertThat(event.title()).isEqualTo(title);
+
+      verify(outboxService).save(event.eventId(), "mople.playlist-search-index-events.v1",
+          playlistId.toString(), event);
     }
 
     @Test
@@ -723,6 +741,9 @@ public class PlaylistServiceTest {
       given(playlistContentRepository.findAllByPlaylistIdOrderByCreatedAtAsc(playlistId))
           .willReturn(List.of());
 
+      given(kafkaProperties.topics().playlistSearchIndex())
+          .willReturn("mople.playlist-search-index-events.v1");
+
       // when
       playlistService.update(playlistId, updateRequest, ownerId);
 
@@ -732,7 +753,10 @@ public class PlaylistServiceTest {
 
       verify(playlistRepository).findById(playlistId);
       verify(playlistContentRepository).findAllByPlaylistIdOrderByCreatedAtAsc(playlistId);
-      verify(eventPublisher).publishEvent(
+      verify(outboxService).save(
+          any(),
+          eq("mople.playlist-search-index-events.v1"),
+          eq(playlistId.toString()),
           argThat((PlaylistSearchIndexEvent event) ->
               event.eventId() != null
                   && event.playlistId().equals(playlist.getId())
@@ -805,6 +829,9 @@ public class PlaylistServiceTest {
 
       // playlistContentRepository.deleteAllByPlaylist(playlistId)는 void 타입이기 때문에 given X(반환값이 없기 때문)
 
+      given(kafkaProperties.topics().playlistSearchIndex())
+          .willReturn("mople.playlist-search-index-events.v1");
+
       // when
       playlistService.delete(playlistId, ownerId);
 
@@ -814,7 +841,10 @@ public class PlaylistServiceTest {
       verify(playlistContentRepository).deleteAllByPlaylistId(playlistId);
       verify(playlistSubscriptionRepository).deleteAllByPlaylistId(playlistId);
       verify(playlistRepository).delete(playlist);
-      verify(eventPublisher).publishEvent(
+      verify(outboxService).save(
+          any(),
+          eq("mople.playlist-search-index-events.v1"),
+          eq(playlistId.toString()),
           argThat((PlaylistSearchIndexDeleteEvent event) ->
               event.eventId() != null
                   && event.playlistId().equals(playlistId)
@@ -913,6 +943,8 @@ public class PlaylistServiceTest {
       given(userRepository.findById(subscriberId)).willReturn(Optional.of(subscriber));
       given(playlistSubscriptionRepository.save(any(PlaylistSubscription.class))).willReturn(
           PlaylistSubscription.create(playlist, subscriber));
+      given(kafkaProperties.topics().playlistSubscribed())
+          .willReturn("mople.playlist.subscribed.v1");
 
       // when
       playlistService.subscribe(playlistId, subscriberId);
@@ -920,7 +952,7 @@ public class PlaylistServiceTest {
       // then
       verify(playlistSubscriptionRepository).save(any(PlaylistSubscription.class));
       verify(playlistRepository).increaseSubscriberCount(playlistId);
-      verify(eventPublisher).publishEvent(subscribedEventCaptor.capture());
+      verify(outboxService).save(any(), any(), any(), subscribedEventCaptor.capture());
 
       PlaylistSubscribedEvent event = subscribedEventCaptor.getValue();
 
@@ -928,6 +960,9 @@ public class PlaylistServiceTest {
       assertThat(event.subscriberId()).isEqualTo(subscriberId);
       assertThat(event.subscriberName()).isEqualTo("구독자");
       assertThat(event.playlistTitle()).isEqualTo(title);
+
+      verify(outboxService).save(event.eventId(), "mople.playlist.subscribed.v1",
+          playlistId.toString(), event);
     }
 
     @Test
@@ -949,7 +984,7 @@ public class PlaylistServiceTest {
 
       verify(playlistSubscriptionRepository, never()).save(any());
       verify(playlistRepository, never()).increaseSubscriberCount(any());
-      verify(eventPublisher, never()).publishEvent(any());
+      verifyNoInteractions(outboxService);
     }
 
     @Test
@@ -966,7 +1001,7 @@ public class PlaylistServiceTest {
 
       verify(playlistSubscriptionRepository, never()).save(any());
       verify(playlistRepository, never()).increaseSubscriberCount(any());
-      verify(eventPublisher, never()).publishEvent(any());
+      verifyNoInteractions(outboxService);
     }
 
     @Test
@@ -985,7 +1020,7 @@ public class PlaylistServiceTest {
 
       verify(playlistSubscriptionRepository, never()).save(any());
       verify(playlistRepository, never()).increaseSubscriberCount(any());
-      verify(eventPublisher, never()).publishEvent(any());
+      verifyNoInteractions(outboxService);
     }
 
     @Test
@@ -1004,7 +1039,7 @@ public class PlaylistServiceTest {
       verify(userRepository, never()).findById(any());
       verify(playlistSubscriptionRepository, never()).save(any());
       verify(playlistRepository, never()).increaseSubscriberCount(any());
-      verify(eventPublisher, never()).publishEvent(any());
+      verifyNoInteractions(outboxService);
     }
 
   }
@@ -1030,7 +1065,7 @@ public class PlaylistServiceTest {
       verify(playlistSubscriptionRepository).deleteByPlaylistIdAndSubscriberId(playlistId,
           subscriberId);
       verify(playlistRepository).decreaseSubscriberCount(playlistId);
-      verifyNoInteractions(eventPublisher);
+      verifyNoInteractions(outboxService);
     }
 
     @Test
@@ -1088,13 +1123,15 @@ public class PlaylistServiceTest {
       PlaylistContent saved = mock(PlaylistContent.class);
       given(saved.getId()).willReturn(playlistContentId);
       given(playlistContentRepository.save(any(PlaylistContent.class))).willReturn(saved);
+      given(kafkaProperties.topics().playlistContentAdded())
+          .willReturn("mople.playlist.content-added.v1");
 
       // when
       playlistService.addContent(playlistId, contentId, ownerId);
 
       // then
       verify(playlistContentRepository).save(any(PlaylistContent.class));
-      verify(eventPublisher).publishEvent(contentAddedEventCaptor.capture());
+      verify(outboxService).save(any(), any(), any(), contentAddedEventCaptor.capture());
 
       PlaylistContentAddedEvent event = contentAddedEventCaptor.getValue();
 
@@ -1102,6 +1139,9 @@ public class PlaylistServiceTest {
       assertThat(event.playlistId()).isEqualTo(playlistId);
       assertThat(event.contentId()).isEqualTo(contentId);
       assertThat(event.playlistTitle()).isEqualTo(title);
+
+      verify(outboxService).save(event.eventId(), "mople.playlist.content-added.v1",
+          playlistId.toString(), event);
     }
 
     @Test
@@ -1128,7 +1168,7 @@ public class PlaylistServiceTest {
       // then
       // 수신자 확산은 알림 리스너의 책임이므로 서비스는 구독자를 조회하지 않는다
       verify(playlistSubscriptionRepository, never()).findSubscriberIdsByPlaylistId(any());
-      verify(eventPublisher, times(1)).publishEvent(contentAddedEventCaptor.capture());
+      verify(outboxService, times(1)).save(any(), any(), any(), contentAddedEventCaptor.capture());
 
       PlaylistContentAddedEvent event = contentAddedEventCaptor.getValue();
 
@@ -1151,7 +1191,7 @@ public class PlaylistServiceTest {
           .hasFieldOrPropertyWithValue("errorCode",
               PlaylistErrorCode.PLAYLIST_CONTENT_PLAY_NOT_FOUND);
 
-      verify(eventPublisher, never()).publishEvent(any());
+      verifyNoInteractions(outboxService);
       verify(playlistContentRepository, never()).save(any());
     }
 
@@ -1171,7 +1211,7 @@ public class PlaylistServiceTest {
           .hasFieldOrPropertyWithValue("errorCode",
               PlaylistErrorCode.PLAYLIST_CONTENT_CONTENT_NOT_FOUND);
 
-      verify(eventPublisher, never()).publishEvent(any());
+      verifyNoInteractions(outboxService);
       verify(playlistContentRepository, never()).save(any());
     }
 
@@ -1194,7 +1234,7 @@ public class PlaylistServiceTest {
           .isInstanceOf(PlaylistException.class)
           .hasFieldOrPropertyWithValue("errorCode", PlaylistErrorCode.PLAYLIST_CONTENT_DUPLICATE);
 
-      verify(eventPublisher, never()).publishEvent(any());
+      verifyNoInteractions(outboxService);
       verify(playlistContentRepository, never()).save(any());
     }
 
@@ -1215,7 +1255,7 @@ public class PlaylistServiceTest {
           .isInstanceOf(PlaylistException.class)
           .hasFieldOrPropertyWithValue("errorCode", PlaylistErrorCode.PLAYLIST_FORBIDDEN);
 
-      verify(eventPublisher, never()).publishEvent(any());
+      verifyNoInteractions(outboxService);
       verify(playlistContentRepository, never()).existsByPlaylistIdAndContentId(any(), any());
       verify(playlistContentRepository, never()).save(any());
     }
@@ -1243,7 +1283,7 @@ public class PlaylistServiceTest {
       playlistService.removeContent(playlistId, contentId, ownerId);
 
       // then
-      verify(eventPublisher, never()).publishEvent(any());
+      verifyNoInteractions(outboxService);
       verify(playlistContentRepository).delete(playlistContent);
     }
 

@@ -193,20 +193,19 @@ class KafkaPublishSmokeTest {
     }
 
     @Test
-    @DisplayName("콘텐츠 추가 이벤트가 커밋된 뒤 토픽에 1건 나가는지")
+    @DisplayName("outbox에 저장한 콘텐츠 추가 이벤트가 커밋된 뒤 relay로 토픽에 1건 나가는지")
     void publishesPlaylistContentAdded() {
       // given
       UUID playlistContentId = UUID.randomUUID();
       UUID playlistId = UUID.randomUUID();
       UUID contentId = UUID.randomUUID();
+      PlaylistContentAddedEvent event = new PlaylistContentAddedEvent(
+          UUID.randomUUID(), Instant.now(), playlistContentId, playlistId, contentId,
+          "테스트 플레이리스트");
 
       try (Consumer<String, String> consumer = consumerFor(PLAYLIST_CONTENT_TOPIC)) {
         // when
-        transactionTemplate.executeWithoutResult(status ->
-            eventPublisher.publishEvent(
-                new PlaylistContentAddedEvent(
-                    UUID.randomUUID(), Instant.now(), playlistContentId, playlistId, contentId,
-                    "테스트 플레이리스트")));
+        saveToOutbox(event.eventId(), PLAYLIST_CONTENT_TOPIC, playlistId.toString(), event);
 
         // then
         ConsumerRecord<String, String> record =
@@ -249,18 +248,17 @@ class KafkaPublishSmokeTest {
     }
 
     @Test
-    @DisplayName("콘텐츠 추가 이벤트 헤더에 클래스 이름이 실리는지")
+    @DisplayName("relay가 보낸 콘텐츠 추가 이벤트 헤더에 클래스 이름이 실리는지")
     void carriesClassNameForPlaylistContentAdded() {
       // given
       UUID playlistId = UUID.randomUUID();
+      PlaylistContentAddedEvent event = new PlaylistContentAddedEvent(
+          UUID.randomUUID(), Instant.now(), UUID.randomUUID(), playlistId,
+          UUID.randomUUID(), "테스트 플레이리스트");
 
       try (Consumer<String, String> consumer = consumerFor(PLAYLIST_CONTENT_TOPIC)) {
         // when
-        transactionTemplate.executeWithoutResult(status ->
-            eventPublisher.publishEvent(
-                new PlaylistContentAddedEvent(
-                    UUID.randomUUID(), Instant.now(), UUID.randomUUID(), playlistId,
-                    UUID.randomUUID(), "테스트 플레이리스트")));
+        saveToOutbox(event.eventId(), PLAYLIST_CONTENT_TOPIC, playlistId.toString(), event);
 
         // then
         ConsumerRecord<String, String> record =
@@ -281,11 +279,6 @@ class KafkaPublishSmokeTest {
       UUID id = UUID.randomUUID();
 
       return Stream.of(
-          arguments(new PlaylistSearchIndexEvent(UUID.randomUUID(), Instant.now(), id, "플리",
-                  Instant.now(), 3L),
-              PLAYLIST_SEARCH_INDEX_TOPIC, PlaylistSearchIndexEvent.class.getName()),
-          arguments(new PlaylistSearchIndexDeleteEvent(UUID.randomUUID(), Instant.now(), id),
-              PLAYLIST_SEARCH_INDEX_TOPIC, PlaylistSearchIndexDeleteEvent.class.getName()),
           arguments(new ContentSearchIndexEvent(UUID.randomUUID(), Instant.now(), id, "콘텐츠",
                   ContentType.MOVIE, 4.5, 10L, Instant.now()),
               CONTENT_SEARCH_INDEX_TOPIC, ContentSearchIndexEvent.class.getName()),
@@ -300,12 +293,6 @@ class KafkaPublishSmokeTest {
           arguments(new UserAccountStatusChangedEvent(UUID.randomUUID(), Instant.now(), id,
                   ForceLogoutReason.ROLE_CHANGE, true),
               USER_ACCOUNT_STATUS_CHANGED_TOPIC, UserAccountStatusChangedEvent.class.getName()),
-          arguments(new PlaylistSubscribedEvent(UUID.randomUUID(), Instant.now(), id, id, id,
-                  "구독자", "플리"),
-              PLAYLIST_SUBSCRIBED_TOPIC, PlaylistSubscribedEvent.class.getName()),
-          arguments(new PlaylistCreatedEvent(UUID.randomUUID(), Instant.now(), id, id, "주인",
-                  "플리"),
-              PLAYLIST_CREATED_TOPIC, PlaylistCreatedEvent.class.getName()),
           arguments(new DirectMessageReceivedEvent(UUID.randomUUID(), Instant.now(), id, id,
                   "발신자", "안녕하세요"),
               DIRECT_MESSAGE_RECEIVED_TOPIC, DirectMessageReceivedEvent.class.getName())
@@ -317,7 +304,18 @@ class KafkaPublishSmokeTest {
 
       return Stream.of(
           arguments(new ReviewWrittenEvent(UUID.randomUUID(), Instant.now(), id, id, "작성자"),
-              REVIEW_WRITTEN_TOPIC, ReviewWrittenEvent.class.getName())
+              REVIEW_WRITTEN_TOPIC, ReviewWrittenEvent.class.getName()),
+          arguments(new PlaylistSearchIndexEvent(UUID.randomUUID(), Instant.now(), id, "플리",
+                  Instant.now(), 3L),
+              PLAYLIST_SEARCH_INDEX_TOPIC, PlaylistSearchIndexEvent.class.getName()),
+          arguments(new PlaylistSearchIndexDeleteEvent(UUID.randomUUID(), Instant.now(), id),
+              PLAYLIST_SEARCH_INDEX_TOPIC, PlaylistSearchIndexDeleteEvent.class.getName()),
+          arguments(new PlaylistSubscribedEvent(UUID.randomUUID(), Instant.now(), id, id, id,
+                  "구독자", "플리"),
+              PLAYLIST_SUBSCRIBED_TOPIC, PlaylistSubscribedEvent.class.getName()),
+          arguments(new PlaylistCreatedEvent(UUID.randomUUID(), Instant.now(), id, id, "주인",
+                  "플리"),
+              PLAYLIST_CREATED_TOPIC, PlaylistCreatedEvent.class.getName())
       );
     }
 
@@ -389,20 +387,18 @@ class KafkaPublishSmokeTest {
     }
 
     @Test
-    @DisplayName("콘텐츠 추가 이벤트가 롤백되면 토픽에 아무것도 안 나가는지")
+    @DisplayName("콘텐츠 추가 이벤트의 outbox 저장이 롤백되면 토픽에 아무것도 안 나가는지")
     void doesNotPublishPlaylistContentAdded() {
       // given
-      UUID playlistContentId = UUID.randomUUID();
       UUID playlistId = UUID.randomUUID();
-      UUID contentId = UUID.randomUUID();
+      PlaylistContentAddedEvent event = new PlaylistContentAddedEvent(
+          UUID.randomUUID(), Instant.now(), UUID.randomUUID(), playlistId, UUID.randomUUID(),
+          "테스트 플레이리스트");
 
       try (Consumer<String, String> consumer = consumerFor(PLAYLIST_CONTENT_TOPIC)) {
         // when
         transactionTemplate.executeWithoutResult(status -> {
-          eventPublisher.publishEvent(
-              new PlaylistContentAddedEvent(
-                  UUID.randomUUID(), Instant.now(), playlistContentId, playlistId, contentId,
-                  "테스트 플레이리스트"));
+          outboxService.save(event.eventId(), PLAYLIST_CONTENT_TOPIC, playlistId.toString(), event);
           status.setRollbackOnly();
         });
 

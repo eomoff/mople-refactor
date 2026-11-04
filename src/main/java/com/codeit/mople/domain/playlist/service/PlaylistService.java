@@ -27,9 +27,11 @@ import com.codeit.mople.domain.user.exception.UserErrorCode;
 import com.codeit.mople.domain.user.exception.UserException;
 import com.codeit.mople.domain.user.repository.UserRepository;
 import com.codeit.mople.global.config.CacheNames;
+import com.codeit.mople.global.config.KafkaProperties;
 import com.codeit.mople.global.dto.CursorResponse;
 import com.codeit.mople.global.dto.SearchResult;
 import com.codeit.mople.global.dto.UserSummary;
+import com.codeit.mople.global.outbox.OutboxService;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
@@ -47,7 +49,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -61,8 +62,9 @@ public class PlaylistService {
   private final PlaylistContentRepository playlistContentRepository;
   private final ContentRepository contentRepository;
   private final PlaylistSubscriptionRepository playlistSubscriptionRepository;
-  private final ApplicationEventPublisher publisher;
   private final PlaylistSearchRepository searchRepository;
+  private final OutboxService outboxService;
+  private final KafkaProperties kafkaProperties;
 
   private final MeterRegistry meterRegistry;
   private Counter playlistCreateCounter;
@@ -108,21 +110,22 @@ public class PlaylistService {
     log.info("플레이리스트 생성 완료: playlistId={}, ownerId={}",
         savedPlaylist.getId(), owner.getId());
 
-    publisher.publishEvent(
-        new PlaylistCreatedEvent(UUID.randomUUID(), savedPlaylist.getCreatedAt(),
-            savedPlaylist.getId(), ownerId, owner.getName(), savedPlaylist.getTitle())
-    );
+    PlaylistCreatedEvent createdEvent = new PlaylistCreatedEvent(UUID.randomUUID(),
+        savedPlaylist.getCreatedAt(), savedPlaylist.getId(), ownerId, owner.getName(),
+        savedPlaylist.getTitle());
+    outboxService.save(createdEvent.eventId(), kafkaProperties.topics().playlistCreated(),
+        createdEvent.playlistId().toString(), createdEvent);
 
-    publisher.publishEvent(
-        new PlaylistSearchIndexEvent(
-            UUID.randomUUID(),
-            savedPlaylist.getCreatedAt(),
-            savedPlaylist.getId(),
-            savedPlaylist.getTitle(),
-            savedPlaylist.getUpdatedAt(),
-            savedPlaylist.getSubscriberCount()
-        )
+    PlaylistSearchIndexEvent indexEvent = new PlaylistSearchIndexEvent(
+        UUID.randomUUID(),
+        savedPlaylist.getCreatedAt(),
+        savedPlaylist.getId(),
+        savedPlaylist.getTitle(),
+        savedPlaylist.getUpdatedAt(),
+        savedPlaylist.getSubscriberCount()
     );
+    outboxService.save(indexEvent.eventId(), kafkaProperties.topics().playlistSearchIndex(),
+        indexEvent.playlistId().toString(), indexEvent);
 
     //생성 완료 후 카운트
     playlistCreateCounter.increment();
@@ -359,16 +362,16 @@ public class PlaylistService {
     log.info("플레이리스트 수정 완료: playlistId={}, ownerId={}",
         playlistId, ownerId);
 
-    publisher.publishEvent(
-        new PlaylistSearchIndexEvent(
-            UUID.randomUUID(),
-            Instant.now(),
-            playlist.getId(),
-            playlist.getTitle(),
-            playlist.getUpdatedAt(),
-            playlist.getSubscriberCount()
-        )
+    PlaylistSearchIndexEvent event = new PlaylistSearchIndexEvent(
+        UUID.randomUUID(),
+        Instant.now(),
+        playlist.getId(),
+        playlist.getTitle(),
+        playlist.getUpdatedAt(),
+        playlist.getSubscriberCount()
     );
+    outboxService.save(event.eventId(), kafkaProperties.topics().playlistSearchIndex(),
+        event.playlistId().toString(), event);
 
     return response;
   }
@@ -401,13 +404,10 @@ public class PlaylistService {
     log.info("플레이리스트 삭제 완료: playlistId={}, ownerId={}",
         playlistId, ownerId);
 
-    publisher.publishEvent(
-        new PlaylistSearchIndexDeleteEvent(
-            UUID.randomUUID(),
-            Instant.now(),
-            playlistId
-        )
-    );
+    PlaylistSearchIndexDeleteEvent event =
+        new PlaylistSearchIndexDeleteEvent(UUID.randomUUID(), Instant.now(), playlistId);
+    outboxService.save(event.eventId(), kafkaProperties.topics().playlistSearchIndex(),
+        event.playlistId().toString(), event);
 
   }
 
@@ -452,7 +452,7 @@ public class PlaylistService {
     log.info("플레이리스트 구독 성공: playlistSubscriptionId={}, playlistId={}, subscriberId={}",
         saved.getId(), playlistId, subscriberId);
 
-    publisher.publishEvent(new PlaylistSubscribedEvent(
+    PlaylistSubscribedEvent event = new PlaylistSubscribedEvent(
         UUID.randomUUID(),
         saved.getCreatedAt(),
         ownerId,
@@ -460,7 +460,9 @@ public class PlaylistService {
         subscriberId,
         subscriber.getName(),
         playlist.getTitle()
-    ));
+    );
+    outboxService.save(event.eventId(), kafkaProperties.topics().playlistSubscribed(),
+        event.playlistId().toString(), event);
 
     // 구독 성공 후 카운트 메트릭
     playlistSubscribeCounter.increment();
@@ -521,14 +523,16 @@ public class PlaylistService {
     log.info("플레이리스트에 콘텐츠 추가 성공: playlistContentId={}, playlistId={}, contentId={}, requesterId={}",
         saved.getId(), playlistId, contentId, requesterId);
 
-    publisher.publishEvent(new PlaylistContentAddedEvent(
+    PlaylistContentAddedEvent event = new PlaylistContentAddedEvent(
         UUID.randomUUID(),
         saved.getCreatedAt(),
         saved.getId(),
         playlistId,
         contentId,
         playlist.getTitle()
-    ));
+    );
+    outboxService.save(event.eventId(), kafkaProperties.topics().playlistContentAdded(),
+        event.playlistId().toString(), event);
 
     //플레이리스트에 콘텐츠 추가 성공 후 카운트
     playlistContentAddCounter.increment();
