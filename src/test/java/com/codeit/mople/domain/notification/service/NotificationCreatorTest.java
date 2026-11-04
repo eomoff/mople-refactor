@@ -7,6 +7,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.codeit.mople.domain.notification.entity.Notification;
 import com.codeit.mople.domain.notification.entity.NotificationTemplate;
@@ -16,12 +17,15 @@ import com.codeit.mople.domain.notification.exception.NotificationErrorCode;
 import com.codeit.mople.domain.notification.exception.NotificationException;
 import com.codeit.mople.domain.notification.repository.NotificationRepository;
 import com.codeit.mople.domain.user.repository.UserRepository;
+import com.codeit.mople.global.config.KafkaProperties;
+import com.codeit.mople.global.outbox.OutboxService;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Answers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -39,6 +43,12 @@ class NotificationCreatorTest {
 
   @Mock
   private ApplicationEventPublisher eventPublisher;
+
+  @Mock
+  private OutboxService outboxService;
+
+  @Mock(answer = Answers.RETURNS_DEEP_STUBS)
+  private KafkaProperties kafkaProperties;
 
   @InjectMocks
   private NotificationCreator notificationCreator;
@@ -77,6 +87,9 @@ class NotificationCreatorTest {
       given(saved.getId())
           .willReturn(notificationId);
 
+      given(kafkaProperties.topics().notificationCreated())
+          .willReturn("mople.notification.created.v1");
+
       // when
       notificationCreator.createNotification(
           receiverId,
@@ -102,8 +115,12 @@ class NotificationCreatorTest {
       verify(eventPublisher)
           .publishEvent(eventCaptor.capture());
 
-      assertThat(eventCaptor.getValue().receiverId()).isEqualTo(receiverId);
-      assertThat(eventCaptor.getValue().notificationId()).isEqualTo(notificationId);
+      NotificationCreatedEvent event = eventCaptor.getValue();
+      assertThat(event.receiverId()).isEqualTo(receiverId);
+      assertThat(event.notificationId()).isEqualTo(notificationId);
+
+      verify(outboxService).save(
+          event.eventId(), "mople.notification.created.v1", receiverId.toString(), event);
     }
 
     @Test
@@ -130,6 +147,8 @@ class NotificationCreatorTest {
 
       verify(eventPublisher, never())
           .publishEvent(any(Object.class));
+
+      verifyNoInteractions(outboxService);
     }
 
     @Test
@@ -155,6 +174,8 @@ class NotificationCreatorTest {
 
       verify(eventPublisher, never())
           .publishEvent(any(Object.class));
+
+      verifyNoInteractions(outboxService);
     }
   }
 }

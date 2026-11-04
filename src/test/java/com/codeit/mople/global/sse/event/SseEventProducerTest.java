@@ -6,6 +6,7 @@ import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.codeit.mople.domain.directmessage.dto.response.DirectMessageDto;
 import com.codeit.mople.domain.directmessage.event.DirectMessageCreatedEvent;
@@ -92,8 +93,8 @@ class SseEventProducerTest {
   }
 
   @Test
-  @DisplayName("알림 생성 이벤트를 재전송용으로 저장한 뒤 receiverId 키로 발행하는지")
-  void savesNotificationForResendBeforePublishing() {
+  @DisplayName("알림 생성 이벤트는 재전송용으로만 저장하고 Kafka로 보내지 않는지")
+  void savesNotificationForResendWithoutPublishing() {
     // given
     UUID notificationId = UUID.randomUUID();
     NotificationCreatedEvent event = new NotificationCreatedEvent(
@@ -107,18 +108,16 @@ class SseEventProducerTest {
     producer.on(event);
 
     // then
-    InOrder inOrder = inOrder(sseService, kafkaTemplate);
-    inOrder.verify(sseService).saveForResend(
+    verify(sseService).saveForResend(
         event.eventId(), receiverId, "notifications", notificationResponse);
-    inOrder.verify(kafkaTemplate)
-        .send("mople.notification.created.v1", receiverId.toString(), event);
+    verifyNoInteractions(kafkaTemplate);
   }
 
   @Test
   @DisplayName("재전송용 저장이 실패해도 발행하는지")
   void publishesEvenIfSaveForResendFails() {
     // given
-    NotificationCreatedEvent event = new NotificationCreatedEvent(
+    DirectMessageCreatedEvent event = new DirectMessageCreatedEvent(
         UUID.randomUUID(), Instant.now(), receiverId, UUID.randomUUID());
 
     willThrow(new RedisConnectionFailureException("redis down"))
@@ -128,6 +127,7 @@ class SseEventProducerTest {
     producer.on(event);
 
     // then
-    verify(kafkaTemplate).send("mople.notification.created.v1", receiverId.toString(), event);
+    verify(kafkaTemplate)
+        .send("mople.direct-message.created.v1", receiverId.toString(), event);
   }
 }

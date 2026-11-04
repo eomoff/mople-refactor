@@ -8,6 +8,8 @@ import com.codeit.mople.domain.notification.exception.NotificationErrorCode;
 import com.codeit.mople.domain.notification.exception.NotificationException;
 import com.codeit.mople.domain.notification.repository.NotificationRepository;
 import com.codeit.mople.domain.user.repository.UserRepository;
+import com.codeit.mople.global.config.KafkaProperties;
+import com.codeit.mople.global.outbox.OutboxService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +24,8 @@ public class NotificationCreator {
 
   private final NotificationRepository notificationRepository;
   private final UserRepository userRepository;
+  private final OutboxService outboxService;
+  private final KafkaProperties kafkaProperties;
 
   private final ApplicationEventPublisher eventPublisher;
 
@@ -49,9 +53,12 @@ public class NotificationCreator {
     Notification saved =
         notificationRepository.save(Notification.create(receiverId, template, type, hashId));
 
-    // 4. 이벤트 발행
-    eventPublisher.publishEvent(
-        new NotificationCreatedEvent(UUID.randomUUID(), saved.getCreatedAt(), receiverId, saved.getId()));
+    // 4. 이벤트 outbox 저장 및 발행
+    NotificationCreatedEvent event = new NotificationCreatedEvent(
+        UUID.randomUUID(), saved.getCreatedAt(), receiverId, saved.getId());
+    outboxService.save(event.eventId(), kafkaProperties.topics().notificationCreated(),
+        receiverId.toString(), event);
+    eventPublisher.publishEvent(event);
 
     log.info("알림 생성 완료: receiverId={}, type={}", receiverId, type);
   }

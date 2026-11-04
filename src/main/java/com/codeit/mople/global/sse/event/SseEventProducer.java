@@ -24,7 +24,6 @@ public class SseEventProducer {
   private final SseEventService sseEventService;
 
   private final String directMessageTopic;
-  private final String notificationTopic;
 
   public SseEventProducer(
       KafkaTemplate<String, Object> kafkaTemplate,
@@ -36,7 +35,6 @@ public class SseEventProducer {
     this.sseService = sseService;
     this.sseEventService = sseEventService;
     this.directMessageTopic = properties.topics().directMessageCreated();
-    this.notificationTopic = properties.topics().notificationCreated();
   }
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -51,8 +49,6 @@ public class SseEventProducer {
   public void on(NotificationCreatedEvent event) {
     saveForResend(event.eventId(), event.receiverId(), "notifications",
         () -> sseEventService.getNotificationResponse(event.notificationId()));
-
-    kafkaTemplate.send(notificationTopic, event.receiverId().toString(), event);
   }
 
   private void saveForResend(

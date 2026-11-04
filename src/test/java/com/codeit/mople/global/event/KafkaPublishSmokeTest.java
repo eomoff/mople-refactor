@@ -114,9 +114,9 @@ class KafkaPublishSmokeTest {
   @Autowired
   OutboxService outboxService;
 
-  private void saveToOutbox(FollowCreatedEvent event) {
-    transactionTemplate.executeWithoutResult(status -> outboxService.save(
-        event.eventId(), FOLLOW_TOPIC, event.followeeId().toString(), event));
+  private void saveToOutbox(UUID eventId, String topic, String key, Object event) {
+    transactionTemplate.executeWithoutResult(status ->
+        outboxService.save(eventId, topic, key, event));
   }
 
   private Consumer<String, String> consumerFor(String topic) {
@@ -154,11 +154,12 @@ class KafkaPublishSmokeTest {
       UUID followId = UUID.randomUUID();
       UUID followeeId = UUID.randomUUID();
       UUID followerId = UUID.randomUUID();
+      FollowCreatedEvent event = new FollowCreatedEvent(
+          UUID.randomUUID(), Instant.now(), followId, followeeId, followerId, "아메리카노좋아");
 
       try (Consumer<String, String> consumer = consumerFor(FOLLOW_TOPIC)) {
         // when
-        saveToOutbox(new FollowCreatedEvent(
-            UUID.randomUUID(), Instant.now(), followId, followeeId, followerId, "아메리카노좋아"));
+        saveToOutbox(event.eventId(), FOLLOW_TOPIC, followeeId.toString(), event);
 
         // then
         ConsumerRecord<String, String> record =
@@ -167,6 +168,27 @@ class KafkaPublishSmokeTest {
         assertThat(record.key()).isEqualTo(followeeId.toString());
         assertThat(record.value()).contains(
             followId.toString(), followeeId.toString(), followerId.toString(), "아메리카노좋아");
+      }
+    }
+
+    @Test
+    @DisplayName("outbox에 저장한 알림 생성 이벤트가 커밋된 뒤 relay로 토픽에 1건 나가는지")
+    void publishesNotificationCreated() throws Exception {
+      // given
+      NotificationCreatedEvent event = new NotificationCreatedEvent(
+          UUID.randomUUID(), Instant.now(), UUID.randomUUID(), UUID.randomUUID());
+
+      try (Consumer<String, String> consumer = consumerFor(NOTIFICATION_TOPIC)) {
+        // when
+        saveToOutbox(event.eventId(), NOTIFICATION_TOPIC, event.receiverId().toString(), event);
+
+        // then
+        ConsumerRecord<String, String> record =
+            KafkaTestUtils.getSingleRecord(consumer, NOTIFICATION_TOPIC, Duration.ofSeconds(10));
+
+        assertThat(record.key()).isEqualTo(event.receiverId().toString());
+        assertThat(record.value()).isEqualTo(objectMapper.writeValueAsString(event));
+        assertThat(typeIdOf(record)).isEqualTo(NotificationCreatedEvent.class.getName());
       }
     }
 
@@ -213,7 +235,7 @@ class KafkaPublishSmokeTest {
 
       try (Consumer<String, String> consumer = consumerFor(FOLLOW_TOPIC)) {
         // when
-        saveToOutbox(event);
+        saveToOutbox(event.eventId(), FOLLOW_TOPIC, event.followeeId().toString(), event);
 
         // then
         ConsumerRecord<String, String> record =
@@ -275,8 +297,6 @@ class KafkaPublishSmokeTest {
               USER_SEARCH_INDEX_TOPIC, UserSearchIndexEvent.class.getName()),
           arguments(new DirectMessageCreatedEvent(UUID.randomUUID(), Instant.now(), id, id),
               DIRECT_MESSAGE_TOPIC, DirectMessageCreatedEvent.class.getName()),
-          arguments(new NotificationCreatedEvent(UUID.randomUUID(), Instant.now(), id, id),
-              NOTIFICATION_TOPIC, NotificationCreatedEvent.class.getName()),
           arguments(new UserAccountStatusChangedEvent(UUID.randomUUID(), Instant.now(), id,
                   ForceLogoutReason.ROLE_CHANGE, true),
               USER_ACCOUNT_STATUS_CHANGED_TOPIC, UserAccountStatusChangedEvent.class.getName()),
