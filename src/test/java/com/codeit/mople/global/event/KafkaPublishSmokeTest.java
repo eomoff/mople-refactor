@@ -20,6 +20,8 @@ import com.codeit.mople.domain.user.admin.enums.ForceLogoutReason;
 import com.codeit.mople.domain.user.admin.event.UserAccountStatusChangedEvent;
 import com.codeit.mople.domain.user.event.UserSearchIndexEvent;
 import com.codeit.mople.global.config.KafkaProperties;
+import com.codeit.mople.global.outbox.OutboxRelay;
+import com.codeit.mople.global.outbox.OutboxService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -58,7 +60,8 @@ import org.springframework.util.ReflectionUtils;
 @SpringBootTest(properties = {
     "spring.kafka.enabled=true",
     "spring.kafka.bootstrap-servers=${spring.embedded.kafka.brokers}",
-    "spring.kafka.listener.auto-startup=false"
+    "spring.kafka.listener.auto-startup=false",
+    "spring.datasource.url=jdbc:h2:mem:kafka-publish-smoke;MODE=PostgreSQL;DB_CLOSE_DELAY=-1"
 })
 @ActiveProfiles("test")
 @EmbeddedKafka(partitions = 1, topics = {
@@ -108,6 +111,14 @@ class KafkaPublishSmokeTest {
   @Autowired
   KafkaProperties kafkaProperties;
 
+  @Autowired
+  OutboxService outboxService;
+
+  private void saveToOutbox(FollowCreatedEvent event) {
+    transactionTemplate.executeWithoutResult(status -> outboxService.save(
+        event.eventId(), FOLLOW_TOPIC, event.followeeId().toString(), event));
+  }
+
   private Consumer<String, String> consumerFor(String topic) {
     Map<String, Object> props =
         KafkaTestUtils.consumerProps("smoke-" + UUID.randomUUID(), "true", embeddedKafka);
@@ -119,10 +130,14 @@ class KafkaPublishSmokeTest {
   }
 
   private String typeIdOf(ConsumerRecord<String, String> record) {
-    Header header = record.headers().lastHeader(TYPE_ID_HEADER);
+    return headerOf(record, TYPE_ID_HEADER);
+  }
+
+  private String headerOf(ConsumerRecord<String, String> record, String name) {
+    Header header = record.headers().lastHeader(name);
 
     assertThat(header)
-        .as("%s 헤더가 안 실림", TYPE_ID_HEADER)
+        .as("%s 헤더가 안 실림", name)
         .isNotNull();
 
     return new String(header.value(), StandardCharsets.UTF_8);
@@ -133,7 +148,7 @@ class KafkaPublishSmokeTest {
   class PublishAfterCommit {
 
     @Test
-    @DisplayName("팔로우 생성 이벤트가 커밋된 뒤 토픽에 1건 나가는지")
+    @DisplayName("outbox에 저장한 팔로우 생성 이벤트가 커밋된 뒤 relay로 토픽에 1건 나가는지")
     void publishesFollowCreated() {
       // given
       UUID followId = UUID.randomUUID();
@@ -142,11 +157,8 @@ class KafkaPublishSmokeTest {
 
       try (Consumer<String, String> consumer = consumerFor(FOLLOW_TOPIC)) {
         // when
-        transactionTemplate.executeWithoutResult(status ->
-            eventPublisher.publishEvent(
-                new FollowCreatedEvent(
-                    UUID.randomUUID(), Instant.now(), followId, followeeId, followerId,
-                    "아메리카노좋아")));
+        saveToOutbox(new FollowCreatedEvent(
+            UUID.randomUUID(), Instant.now(), followId, followeeId, followerId, "아메리카노좋아"));
 
         // then
         ConsumerRecord<String, String> record =
@@ -192,24 +204,25 @@ class KafkaPublishSmokeTest {
   class TypeHeader {
 
     @Test
-    @DisplayName("팔로우 생성 이벤트 헤더에 클래스 이름이 실리는지")
-    void carriesClassNameForFollowCreated() {
+    @DisplayName("relay가 보낸 팔로우 생성 이벤트에 원래 JSON과 클래스 이름, eventId 헤더가 실리는지")
+    void carriesClassNameAndEventIdForFollowCreated() throws Exception {
       // given
-      UUID followeeId = UUID.randomUUID();
+      FollowCreatedEvent event = new FollowCreatedEvent(
+          UUID.randomUUID(), Instant.now(), UUID.randomUUID(), UUID.randomUUID(),
+          UUID.randomUUID(), "아메리카노좋아");
 
       try (Consumer<String, String> consumer = consumerFor(FOLLOW_TOPIC)) {
         // when
-        transactionTemplate.executeWithoutResult(status ->
-            eventPublisher.publishEvent(
-                new FollowCreatedEvent(
-                    UUID.randomUUID(), Instant.now(), UUID.randomUUID(), followeeId,
-                    UUID.randomUUID(), "아메리카노좋아")));
+        saveToOutbox(event);
 
         // then
         ConsumerRecord<String, String> record =
             KafkaTestUtils.getSingleRecord(consumer, FOLLOW_TOPIC, Duration.ofSeconds(10));
 
+        assertThat(record.value()).isEqualTo(objectMapper.writeValueAsString(event));
         assertThat(typeIdOf(record)).isEqualTo(FollowCreatedEvent.class.getName());
+        assertThat(headerOf(record, OutboxRelay.EVENT_ID_HEADER))
+            .isEqualTo(event.eventId().toString());
       }
     }
 
@@ -304,19 +317,18 @@ class KafkaPublishSmokeTest {
   class NoPublishOnRollback {
 
     @Test
-    @DisplayName("팔로우 생성 이벤트가 롤백되면 토픽에 아무것도 안 나가는지")
+    @DisplayName("팔로우 생성 이벤트의 outbox 저장이 롤백되면 토픽에 아무것도 안 나가는지")
     void doesNotPublishFollowCreated() {
       // given
-      UUID followId = UUID.randomUUID();
-      UUID followeeId = UUID.randomUUID();
-      UUID followerId = UUID.randomUUID();
+      FollowCreatedEvent event = new FollowCreatedEvent(
+          UUID.randomUUID(), Instant.now(), UUID.randomUUID(), UUID.randomUUID(),
+          UUID.randomUUID(), "아메리카노좋아");
 
       try (Consumer<String, String> consumer = consumerFor(FOLLOW_TOPIC)) {
         // when
         transactionTemplate.executeWithoutResult(status -> {
-          eventPublisher.publishEvent(
-              new FollowCreatedEvent(
-                  UUID.randomUUID(), Instant.now(), followId, followeeId, followerId, "아메리카노좋아"));
+          outboxService.save(
+              event.eventId(), FOLLOW_TOPIC, event.followeeId().toString(), event);
           status.setRollbackOnly();
         });
 

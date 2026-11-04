@@ -11,6 +11,8 @@ import com.codeit.mople.domain.follow.repository.FollowRepository;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.repository.UserRepository;
 import com.codeit.mople.global.config.CacheNames;
+import com.codeit.mople.global.config.KafkaProperties;
+import com.codeit.mople.global.outbox.OutboxService;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -30,6 +32,8 @@ public class FollowService {
   private final UserRepository userRepository;
   private final FollowRepository followRepository;
   private final ApplicationEventPublisher publisher;
+  private final OutboxService outboxService;
+  private final KafkaProperties kafkaProperties;
 
   @Transactional
   public FollowResponse follow(FollowRequest request, UUID followerId) {
@@ -61,14 +65,17 @@ public class FollowService {
     log.info("팔로우 성공: followId={}, followeeId={}, followerId={}", saved.getId(), followeeId,
         followerId);
 
-    publisher.publishEvent(new FollowCreatedEvent(
+    FollowCreatedEvent event = new FollowCreatedEvent(
         UUID.randomUUID(),
         saved.getCreatedAt(),
         saved.getId(),
         followeeId,
         followerId,
         follower.getName()
-    ));
+    );
+    outboxService.save(
+        event.eventId(), kafkaProperties.topics().followCreated(), followeeId.toString(), event);
+    publisher.publishEvent(event);
 
     return FollowResponse.from(saved);
   }

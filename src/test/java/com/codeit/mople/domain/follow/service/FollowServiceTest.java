@@ -19,7 +19,9 @@ import com.codeit.mople.domain.follow.exception.FollowErrorCode;
 import com.codeit.mople.domain.follow.repository.FollowRepository;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.repository.UserRepository;
+import com.codeit.mople.global.config.KafkaProperties;
 import com.codeit.mople.global.error.CustomException;
+import com.codeit.mople.global.outbox.OutboxService;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -28,6 +30,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Answers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
@@ -47,6 +50,10 @@ class FollowServiceTest {
   UserRepository userRepository;
   @Mock
   ApplicationEventPublisher publisher;
+  @Mock
+  OutboxService outboxService;
+  @Mock(answer = Answers.RETURNS_DEEP_STUBS)
+  KafkaProperties kafkaProperties;
 
   @Captor
   ArgumentCaptor<Follow> followCaptor;
@@ -67,7 +74,7 @@ class FollowServiceTest {
   class CreateFollow {
 
     @Test
-    @DisplayName("팔로우 생성에 성공하면 팔로우를 저장하고 생성 이벤트를 발행")
+    @DisplayName("팔로우 생성에 성공하면 팔로우와 생성 이벤트 outbox를 저장하고 이벤트를 발행")
     void followSuccess() {
       // given
       User followee = mock(User.class);
@@ -83,6 +90,7 @@ class FollowServiceTest {
       given(followRepository.save(any(Follow.class))).willReturn(saved);
       given(followee.getId()).willReturn(followeeId);
       given(follower.getId()).willReturn(followerId);
+      given(kafkaProperties.topics().followCreated()).willReturn("mople.follow.created.v1");
 
       // when
       FollowResponse actual = followService.follow(request, followerId);
@@ -106,6 +114,9 @@ class FollowServiceTest {
       assertThat(published.followeeId()).isEqualTo(followeeId);
       assertThat(published.followerId()).isEqualTo(followerId);
       assertThat(published.followerName()).isEqualTo("아메리카노좋아");
+
+      verify(outboxService).save(
+          published.eventId(), "mople.follow.created.v1", followeeId.toString(), published);
     }
 
     @Test
@@ -120,7 +131,7 @@ class FollowServiceTest {
           .extracting(CustomException::getErrorCode)
           .isEqualTo(FollowErrorCode.FOLLOW_SELF_NOT_ALLOWED);
 
-      verifyNoInteractions(userRepository, followRepository, publisher);
+      verifyNoInteractions(userRepository, followRepository, publisher, outboxService);
     }
 
     @Test
@@ -139,6 +150,7 @@ class FollowServiceTest {
 
       verify(followRepository, never()).save(any(Follow.class));
       verify(publisher, never()).publishEvent(any(FollowCreatedEvent.class));
+      verifyNoInteractions(outboxService);
     }
 
     @Test
@@ -159,6 +171,7 @@ class FollowServiceTest {
 
       verify(followRepository, never()).save(any(Follow.class));
       verify(publisher, never()).publishEvent(any(FollowCreatedEvent.class));
+      verifyNoInteractions(outboxService);
     }
 
     @Test
@@ -176,6 +189,7 @@ class FollowServiceTest {
 
       verify(followRepository, never()).save(any(Follow.class));
       verify(publisher, never()).publishEvent(any(FollowCreatedEvent.class));
+      verifyNoInteractions(outboxService);
     }
   }
 
