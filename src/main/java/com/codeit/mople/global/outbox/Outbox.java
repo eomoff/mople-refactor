@@ -12,6 +12,7 @@ import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -29,6 +30,9 @@ public class Outbox {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
+
+  @Column(nullable = false)
+  private UUID eventId;
 
   @Column(nullable = false, length = 100)
   private String aggregateType;
@@ -56,7 +60,9 @@ public class Outbox {
   @Column
   private Instant sentAt;
 
-  private Outbox(String aggregateType, String aggregateId, String eventType, String payload) {
+  private Outbox(
+      UUID eventId, String aggregateType, String aggregateId, String eventType, String payload) {
+    this.eventId = Objects.requireNonNull(eventId, "eventId");
     this.aggregateType = Objects.requireNonNull(aggregateType, "aggregateType");
     this.aggregateId = Objects.requireNonNull(aggregateId, "aggregateId");
     this.eventType = Objects.requireNonNull(eventType, "eventType");
@@ -65,7 +71,16 @@ public class Outbox {
   }
 
   public static Outbox create(
-      String aggregateType, String aggregateId, String eventType, String payload) {
-    return new Outbox(aggregateType, aggregateId, eventType, payload);
+      UUID eventId, String aggregateType, String aggregateId, String eventType, String payload) {
+    return new Outbox(eventId, aggregateType, aggregateId, eventType, payload);
+  }
+
+  public void markSent() {
+    this.status = OutboxStatus.SENT;
+    this.sentAt = Instant.now();
+  }
+
+  public void increaseRetryCount() {
+    this.retryCount++;
   }
 }
